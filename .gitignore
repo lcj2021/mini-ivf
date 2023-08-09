@@ -1,3 +1,6 @@
+release/
+.git/
+
 # Prerequisites
 *.d
 
