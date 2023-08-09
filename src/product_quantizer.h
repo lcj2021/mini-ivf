@@ -5,11 +5,10 @@
 
 class ProductQuantizer {
 public:
-    ProductQuantizer(int M, int Ks=256, bool verbose=true) {
-        this->M = M;
-        this->Ks = Ks;
+    ProductQuantizer(int M, int nbits, bool verbose=true) : M(M), nbits(nbits) {
+        this->Ks = 1 << nbits;
         this->verbose = verbose;
-        // this->code_dtype = (Ks <= 256) ? UINT8 : ((Ks <= 65536) ? UINT16 : UINT32);
+        // this->code_dtype = (Ks <= 256) ? uint_8 : ((Ks <= 65536) ? uint_16 : uint_32);
         if (verbose) {
             std::cout << "M: " << M << ", Ks: " << Ks << '\n';
         }
@@ -153,9 +152,12 @@ public:
     }
 
 private:
-    int M;
-    int Ks;
-    int Ds;
+    size_t M;       // number of subquantizers (sub-spaces)
+    size_t nbits;   // nbits per quantization index 
+
+    // derived from above
+    size_t Ks;      // number of centroids for each subquantizer
+    size_t Ds;      // number of demensions per subquantizers (sub-spaces)
     bool verbose;
     // std::size_t code_dtype;
     std::vector<std::vector<std::vector<float>>> codewords;

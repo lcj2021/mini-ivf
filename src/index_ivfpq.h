@@ -1,6 +1,3 @@
-#ifndef RII_H
-#define RII_H
-
 #include <iostream>
 #include <iomanip>
 #include <cassert>
@@ -11,19 +8,7 @@
 // #include "./inverted_lists.h"
 #include "./util.h"
 
-// Handle missing ssize_t on Windows. 
-# if defined(_MSC_VER) 
-    typedef __int64 ssize_t;
-# endif
-
-// For py::array_t
-// See http://pybind11.readthedocs.io/en/master/advanced/pycpp/numpy.html#direct-access
-// #include <pybind11/pybind11.h>
-// #include <pybind11/numpy.h>
-// namespace py = pybind11;
-
-
-namespace rii {
+namespace Toy {
 
 
 struct DistanceTable{
@@ -42,23 +27,22 @@ struct DistanceTable{
 
 
 
-class RiiCpp {
+class IndexIVFPQ {
 public:
-    RiiCpp() {}  // Shouldn't be default-constructed
-    RiiCpp(const std::vector<std::vector<std::vector<float>>> &codewords, size_t nlist, bool verbose);
+    IndexIVFPQ() {}  // Shouldn't be default-constructed
+    IndexIVFPQ(const std::vector<std::vector<std::vector<float>>> &codewords, size_t nlist, bool verbose);
 
     //void SetCodewords(const py::array_t<float> &codewords);  // This should be called first
     void Reconfigure(int nlist, int iter);
     void AddCodes(const std::vector<std::vector<unsigned char>> &codes, bool update_flag);
 
-    std::pair<std::vector<size_t>, std::vector<float>> QueryIvf(const std::vector<float> &query,
+    std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float> &query,
                                                              const std::vector<int> &gt,
                                                              int topk,
                                                              int L,
                                                              int nprobe);
     void Clear();
 
-    // ===== Functions that would not be called from Python (Used inside c++) =====
     void UpdatePostingLists(size_t num);
     DistanceTable DTable(const std::vector<float> &vec) const;
     float ADist(const DistanceTable &dtable, const std::vector<unsigned char> &code) const;
@@ -89,7 +73,7 @@ public:
 };
 
 
-RiiCpp::RiiCpp(const std::vector<std::vector<std::vector<float>>> &codewords, size_t nlist, bool verbose)
+IndexIVFPQ::IndexIVFPQ(const std::vector<std::vector<std::vector<float>>> &codewords, size_t nlist, bool verbose)
 {
     verbose_ = verbose;
     const auto &r = codewords;  // codewords must have ndim=3, with non-writable
@@ -104,7 +88,7 @@ RiiCpp::RiiCpp(const std::vector<std::vector<std::vector<float>>> &codewords, si
             }
         }
     }
-    std::cout << nlist << '\n';
+    // std::cout << nlist << '\n';
     // ivl = ArrayInvertedLists(nlist, M_);
 
     if (verbose_) {
@@ -113,7 +97,8 @@ RiiCpp::RiiCpp(const std::vector<std::vector<std::vector<float>>> &codewords, si
     }
 }
 
-void RiiCpp::Reconfigure(int nlist, int iter)
+void 
+IndexIVFPQ::Reconfigure(int nlist, int iter)
 {
     assert(0 < nlist);
     assert((size_t) nlist <= GetN());
@@ -185,7 +170,8 @@ void RiiCpp::Reconfigure(int nlist, int iter)
         << timer1.get_time() / (timer1.get_time() + timer2.get_time()) << '\n';
 }
 
-void RiiCpp::AddCodes(const std::vector<std::vector<unsigned char>> &codes, bool update_flag)
+void 
+IndexIVFPQ::AddCodes(const std::vector<std::vector<unsigned char>> &codes, bool update_flag)
 {
     // (1) Add new input codes to flatted_codes. This imply pushes back the elements.
     // After that, if update_flg=true, (2) update posting lists for the input codes.
@@ -223,7 +209,8 @@ void RiiCpp::AddCodes(const std::vector<std::vector<unsigned char>> &codes, bool
     }
 }
 
-std::pair<std::vector<size_t>, std::vector<float> > RiiCpp::QueryIvf(const std::vector<float> &query,
+std::pair<std::vector<size_t>, std::vector<float> > 
+IndexIVFPQ::query(const std::vector<float> &query,
                                                              const std::vector<int> &gt,
                                                              int topk,
                                                              int L,
@@ -273,7 +260,9 @@ std::pair<std::vector<size_t>, std::vector<float> > RiiCpp::QueryIvf(const std::
         coarse_cnt++;
         size_t bl = posting_lists_[no].size(), br = 0;
         size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
-        // [todo] This loop can be parallelized
+
+        // [TODO] parallelized
+        // Doesn't benefit 
 // #pragma omp parallel for if(posting_lists_len > 10000)
         for (size_t idx = 0; idx < posting_lists_len; ++idx) {
             // std::lock_guard<std::mutex> lock(mutex);
@@ -307,23 +296,22 @@ std::pair<std::vector<size_t>, std::vector<float> > RiiCpp::QueryIvf(const std::
             // timer2.stop();
             // std::cout << timer1.get_time() << ' ' << timer2.get_time() << " | " 
             //             << timer2.get_time() / (timer1.get_time() + timer2.get_time()) << '\n';
-            // ===== (9) Return the result, in the form of pair<vec, vec> =====
-            // Note that this returns two lists, not np.array
-            return PairVectorToVectorPair(scores);
+            return PairVectorToVectorPair(scores);  // return pair<vec, vec>
         }
     }
-    // It can be happened that vectors are not found
     return std::pair<std::vector<size_t>, std::vector<float>>({}, {});
 }
 
-void RiiCpp::Clear()
+void 
+IndexIVFPQ::Clear()
 {
     coarse_centers_.clear();
     flattened_codes_.clear();
     posting_lists_.clear();
 }
 
-void RiiCpp::UpdatePostingLists(size_t num)
+void 
+IndexIVFPQ::UpdatePostingLists(size_t num)
 {
     // Update (add) identifiers to posting lists, from codes[start] to codes[start + num -1]
     // This just add IDs, so be careful to call this (e.g., the same IDs will be added if you call
@@ -368,7 +356,8 @@ void RiiCpp::UpdatePostingLists(size_t num)
     }
 }
 
-DistanceTable RiiCpp::DTable(const std::vector<float> &vec) const
+DistanceTable 
+IndexIVFPQ::DTable(const std::vector<float> &vec) const
 {
     const auto &v = vec;
     size_t Ds = codewords_[0][0].size();
@@ -382,7 +371,8 @@ DistanceTable RiiCpp::DTable(const std::vector<float> &vec) const
     return dtable;
 }
 
-float RiiCpp::ADist(const DistanceTable &dtable, const std::vector<unsigned char> &code) const
+float 
+IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<unsigned char> &code) const
 {
     assert(code.size() == M_);
     float dist = 0;
@@ -393,7 +383,8 @@ float RiiCpp::ADist(const DistanceTable &dtable, const std::vector<unsigned char
     return dist;
 }
 
-float RiiCpp::ADist(const DistanceTable &dtable, const std::vector<unsigned char> &flattened_codes, size_t n) const
+float 
+IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<unsigned char> &flattened_codes, size_t n) const
 {
     float dist = 0;
     for (size_t m = 0; m < M_; ++m) {
@@ -403,7 +394,8 @@ float RiiCpp::ADist(const DistanceTable &dtable, const std::vector<unsigned char
     return dist;
 }
 
-std::pair<std::vector<size_t>, std::vector<float> > RiiCpp::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > &pair_vec) const
+std::pair<std::vector<size_t>, std::vector<float> > 
+IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > &pair_vec) const
 {
     std::pair<std::vector<size_t>, std::vector<float>> vec_pair(std::vector<size_t>(pair_vec.size()), std::vector<float>(pair_vec.size()));
     for(size_t n = 0, N = pair_vec.size(); n < N; ++n) {
@@ -415,17 +407,17 @@ std::pair<std::vector<size_t>, std::vector<float> > RiiCpp::PairVectorToVectorPa
 
 
 
-std::vector<unsigned char> RiiCpp::NthCode(const std::vector<unsigned char> &long_code, size_t n) const
+std::vector<unsigned char> 
+IndexIVFPQ::NthCode(const std::vector<unsigned char> &long_code, size_t n) const
 {
     return std::vector<unsigned char>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
-unsigned char RiiCpp::NthCodeMthElement(const std::vector<unsigned char> &long_code, std::size_t n, size_t m) const
+unsigned char 
+IndexIVFPQ::NthCodeMthElement(const std::vector<unsigned char> &long_code, std::size_t n, size_t m) const
 {
     return long_code[ n * M_ + m];
 }
 
 
-} // namespace rii
-
-#endif // RII_H
+} // namespace Toy

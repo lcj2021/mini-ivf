@@ -17,7 +17,7 @@
 // But it doesn't seem drastically fast. Only slightly faster than AVX:
 // (runtime) REF >> SSE >= AVX ~ AVX512
 
-namespace rii {
+namespace Toy {
 
 // From Faiss.
 // Reference implementation
@@ -254,6 +254,6 @@ float fvec_L2sqr (const float *x, const float *y, size_t d)
 
 
 
-} // namespace rii
+} // namespace Toy
 
 #endif // DISTANCE_H

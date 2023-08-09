@@ -1,21 +1,19 @@
 
 cmake_minimum_required(VERSION 3.10)
 
-project(LRC)
+project(Toy)
 
 set(CMAKE_CXX_STANDARD 17)
 
 find_package(OpenMP REQUIRED)
 
-# add_subdirectory(src)
 add_executable(main 
     src/main.cpp
-    src/rii.h
+    src/index_ivfpq.h
     src/pqkmeans.cpp
     src/util.h
     src/distance.h
     src/product_quantizer.h
-    # src/inverted_lists.cpp
     )
 
 target_compile_options(main PRIVATE
