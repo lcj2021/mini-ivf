@@ -15,7 +15,7 @@ PQKMeans::PQKMeans(std::vector<std::vector<std::vector<float> > > codewords, int
     if (256 < Ks) {
         std::cerr << "Error. Ks is too large. "
                   << "Currently, we only support PQ code with Ks <= 256 "
-                  << "so that each subspace is represented by unsigned char (8 bit)"
+                  << "so that each subspace is represented by uint8_t (8 bit)"
                   << std::endl;
         throw;
     }
@@ -34,7 +34,7 @@ PQKMeans::PQKMeans(std::vector<std::vector<std::vector<float> > > codewords, int
     }
 }
 
-int PQKMeans::predict_one(const std::vector<unsigned char> &pyvector)
+int PQKMeans::predict_one(const std::vector<uint8_t> &pyvector)
 {
     assert(pyvector.size() == M_);
     std::pair<std::size_t, float> nearest_one = FindNearetCenterLinear(pyvector, centers_);
@@ -43,20 +43,20 @@ int PQKMeans::predict_one(const std::vector<unsigned char> &pyvector)
 
 
 
-void PQKMeans::fit(const std::vector<unsigned char> &pydata) {
+void PQKMeans::fit(const std::vector<uint8_t> &pydata) {
     assert( (size_t) K_ * M_ <= pydata.size());
     assert(pydata.size() % M_ == 0);
     std::size_t N = pydata.size() / M_;
 
     // Refresh
     centers_.clear();
-    centers_.resize((std::size_t) K_, std::vector<unsigned char>(M_));
+    centers_.resize((std::size_t) K_, std::vector<uint8_t>(M_));
     assignments_.clear();
     assignments_.resize(N);
     assignments_.shrink_to_fit(); // If the previous fit malloced a long assignment array, shrink it.
 
     // Prepare data temporal buffer
-    std::vector<std::vector<unsigned char>> centers_new, centers_old;
+    std::vector<std::vector<uint8_t>> centers_new, centers_old;
 
     // (1) Initialization
     // [todo] Currently, only random pick is supported
@@ -95,7 +95,7 @@ void PQKMeans::fit(const std::vector<unsigned char> &pydata) {
         // (2.5) assignments -> selected_indices_foreach_center
         for (std::size_t n = 0; n < N; ++n) {
             int k = assignments_[n];
-            selected_indices_foreach_center[k].push_back(n);
+            selected_indices_foreach_center[k].emplace_back(n);
             error_sum += errors[n];
         }
 
@@ -137,20 +137,20 @@ const std::vector<int> PQKMeans::GetAssignments()
     return assignments_;
 }
 
-std::vector<std::vector<unsigned char>> PQKMeans::GetClusterCenters()
+std::vector<std::vector<uint8_t>> PQKMeans::GetClusterCenters()
 {
     return centers_;
 }
 
-void PQKMeans::SetClusterCenters(const std::vector<std::vector<unsigned char>> &centers_new)
+void PQKMeans::SetClusterCenters(const std::vector<std::vector<uint8_t>> &centers_new)
 {
     assert(centers_new.size() == (size_t) K_);
     centers_ = centers_new;
 }
 
 
-float PQKMeans::SymmetricDistance(const std::vector<unsigned char> &code1,
-                                  const std::vector<unsigned char> &code2)
+float PQKMeans::SymmetricDistance(const std::vector<uint8_t> &code1,
+                                  const std::vector<uint8_t> &code2)
 {
     // assert(code1.size() == code2.size());
     // assert(code1.size() == M_);
@@ -174,7 +174,7 @@ float PQKMeans::L2SquaredDistance(const std::vector<float> &vec1,
 
 
 
-void PQKMeans::InitializeCentersByRandomPicking(const std::vector<unsigned char> &codes, int K, std::vector<std::vector<unsigned char> > *centers)
+void PQKMeans::InitializeCentersByRandomPicking(const std::vector<uint8_t> &codes, int K, std::vector<std::vector<uint8_t> > *centers)
 {
     assert(centers != nullptr);
     centers->clear();
@@ -182,16 +182,16 @@ void PQKMeans::InitializeCentersByRandomPicking(const std::vector<unsigned char>
 
     std::vector<int> ids(codes.size() / M_);
     std::iota(ids.begin(), ids.end(), 0); // 0, 1, 2, ..., codes.size()-1
-    std::mt19937 random_engine(0);
-    std::shuffle(ids.begin(), ids.end(), random_engine);
+    std::mt19937 default_random_engine(0);
+    std::shuffle(ids.begin(), ids.end(), default_random_engine);
     for (std::size_t k = 0; k < (std::size_t) K; ++k) {
         (*centers)[k] = NthCode(codes, ids[k]);
     }
 
 }
 
-std::pair<std::size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector<unsigned char> &query,
-                                                               const std::vector<std::vector<unsigned char> > &codes)
+std::pair<std::size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector<uint8_t> &query,
+                                                               const std::vector<std::vector<uint8_t> > &codes)
 {
     std::vector<float> dists(codes.size());
 
@@ -220,9 +220,10 @@ std::pair<std::size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector
 
 
 
-std::vector<unsigned char> PQKMeans::ComputeCenterBySparseVoting(const std::vector<unsigned char> &codes, const std::vector<std::size_t> &selected_ids)
+std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uint8_t> &codes, 
+                                                        const std::vector<std::size_t> &selected_ids)
 {
-    std::vector<unsigned char> average_code(M_);
+    std::vector<uint8_t> average_code(M_);
     std::size_t Ks = codewords_[0].size();  // The number of codewords for each subspace
 
     for (std::size_t m = 0; m < M_; ++m) {
@@ -254,17 +255,17 @@ std::vector<unsigned char> PQKMeans::ComputeCenterBySparseVoting(const std::vect
             }
         }
         assert(min_ks != -1);
-        average_code[m] = (unsigned char) min_ks;
+        average_code[m] = (uint8_t) min_ks;
     }
     return average_code;
 }
 
-std::vector<unsigned char> PQKMeans::NthCode(const std::vector<unsigned char> &long_code, std::size_t n)
+std::vector<uint8_t> PQKMeans::NthCode(const std::vector<uint8_t> &long_code, std::size_t n)
 {
-    return std::vector<unsigned char>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
+    return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
-unsigned char PQKMeans::NthCodeMthElement(const std::vector<unsigned char> &long_code, std::size_t n, int m)
+uint8_t PQKMeans::NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, int m)
 {
     return long_code[ n * M_ + m];
 }

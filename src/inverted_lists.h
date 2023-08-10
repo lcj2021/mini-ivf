@@ -1,3 +1,4 @@
+#pragma once
 #include <vector>
 #include <cstdint>
 
@@ -26,14 +27,8 @@ struct InvertedLists {
     /*************************
      *  Read only functions */
 
-    // check if the list is empty
-    bool is_empty(size_t list_no) const;
-
     /// get the size of a list
     virtual size_t list_size(size_t list_no) const = 0;
-
-    /// get iterable for lists that use_iterator
-    virtual InvertedListsIterator* get_iterator(size_t list_no) const;
 
     /** get the codes for an inverted list
      * must be released by release_codes
@@ -96,111 +91,13 @@ struct InvertedLists {
     virtual void reset();
 
     /*************************
-     * high level functions  */
-
-    /// move all entries from oivf (empty on output)
-    void merge_from(InvertedLists* oivf, size_t add_id);
-
-    // how to copy a subset of elements from the inverted lists
-    // This depends on two integers, a1 and a2.
-    enum subset_type_t : int {
-        // depends on IDs
-        SUBSET_TYPE_ID_RANGE = 0, // copies ids in [a1, a2)
-        SUBSET_TYPE_ID_MOD = 1,   // copies ids if id % a1 == a2
-        // depends on order within invlists
-        SUBSET_TYPE_ELEMENT_RANGE =
-                2, // copies fractions of invlists so that a1 elements are left
-                   // before and a2 after
-        SUBSET_TYPE_INVLIST_FRACTION =
-                3, // take fraction a2 out of a1 from each invlist, 0 <= a2 < a1
-        // copy only inverted lists a1:a2
-        SUBSET_TYPE_INVLIST = 4
-    };
-
-    /** copy a subset of the entries index to the other index
-     * @return number of entries copied
-     */
-    size_t copy_subset_to(
-            InvertedLists& other,
-            subset_type_t subset_type,
-            idx_t a1,
-            idx_t a2) const;
-
-    /*************************
      * statistics            */
-
-    /// 1= perfectly balanced, >1: imbalanced
-    double imbalance_factor() const;
 
     /// display some stats about the inverted lists
     void print_stats() const;
 
     /// sum up list sizes
     size_t compute_ntotal() const;
-
-    /**************************************
-     * Scoped inverted lists (for automatic deallocation)
-     *
-     * instead of writing:
-     *
-     *     uint8_t * codes = invlists->get_codes (10);
-     *     ... use codes
-     *     invlists->release_codes(10, codes)
-     *
-     * write:
-     *
-     *    ScopedCodes codes (invlists, 10);
-     *    ... use codes.get()
-     *    // release called automatically when codes goes out of scope
-     *
-     * the following function call also works:
-     *
-     *    foo (123, ScopedCodes (invlists, 10).get(), 456);
-     *
-     */
-
-    struct ScopedIds {
-        const InvertedLists* il;
-        const idx_t* ids;
-        size_t list_no;
-
-        ScopedIds(const InvertedLists* il, size_t list_no)
-                : il(il), ids(il->get_ids(list_no)), list_no(list_no) {}
-
-        const idx_t* get() {
-            return ids;
-        }
-
-        idx_t operator[](size_t i) const {
-            return ids[i];
-        }
-
-        ~ScopedIds() {
-            il->release_ids(list_no, ids);
-        }
-    };
-
-    struct ScopedCodes {
-        const InvertedLists* il;
-        const uint8_t* codes;
-        size_t list_no;
-
-        ScopedCodes(const InvertedLists* il, size_t list_no)
-                : il(il), codes(il->get_codes(list_no)), list_no(list_no) {}
-
-        ScopedCodes(const InvertedLists* il, size_t list_no, size_t offset)
-                : il(il),
-                  codes(il->get_single_code(list_no, offset)),
-                  list_no(list_no) {}
-
-        const uint8_t* get() {
-            return codes;
-        }
-
-        ~ScopedCodes() {
-            il->release_codes(list_no, codes);
-        }
-    };
 };
 
 /// simple (default) implementation as an array of inverted lists

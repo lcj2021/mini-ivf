@@ -16,18 +16,18 @@ class PQKMeans {
 public:
     PQKMeans(std::vector<std::vector<std::vector<float>>> codewords, int K, int itr, bool verbose);
 
-    int predict_one(const std::vector<unsigned char> &pyvector);
-    void fit(const std::vector<unsigned char> &pydata);  // pydata is a long array. pydata.size == N * M
+    int predict_one(const std::vector<uint8_t> &pyvector);
+    void fit(const std::vector<uint8_t> &pydata);  // pydata is a long array. pydata.size == N * M
 
     const std::vector<int> GetAssignments();
 
-    void SetClusterCenters(const std::vector<std::vector<unsigned char>> &centers_new);
-    std::vector<std::vector<unsigned char>> GetClusterCenters();
+    void SetClusterCenters(const std::vector<std::vector<uint8_t>> &centers_new);
+    std::vector<std::vector<uint8_t>> GetClusterCenters();
     int K() const { return K_; }
     int Iteration() const { return iteration_; }
     bool Verbose() const { return verbose_; }
-    float SymmetricDistance(const std::vector<unsigned char> &code1,
-                            const std::vector<unsigned char> &code2);
+    float SymmetricDistance(const std::vector<uint8_t> &code1,
+                            const std::vector<uint8_t> &code2);
 
     float L2SquaredDistance(const std::vector<float> &vec1,
                             const std::vector<float> &vec2);
@@ -41,29 +41,29 @@ private:
     std::size_t M_; // the number of subspace
     bool verbose_;
 
-    std::vector<std::vector<unsigned char>> centers_;  // centers for clustering.
+    std::vector<std::vector<uint8_t>> centers_;  // centers for clustering.
     std::vector<int> assignments_;  // assignement for each intput vector
 
 
 
-    void InitializeCentersByRandomPicking(const std::vector<unsigned char> &codes,  // codes.size == N * M
+    void InitializeCentersByRandomPicking(const std::vector<uint8_t> &codes,  // codes.size == N * M
                                           int K,
-                                          std::vector<std::vector<unsigned char>> *centers_);
+                                          std::vector<std::vector<uint8_t>> *centers_);
 
     // Linear search by Symmetric Distance computation. Return the best one (id, distance)
-    std::pair<std::size_t, float> FindNearetCenterLinear(const std::vector<unsigned char> &query,
-                                                         const std::vector<std::vector<unsigned char>> &codes);
+    std::pair<std::size_t, float> FindNearetCenterLinear(const std::vector<uint8_t> &query,
+                                                         const std::vector<std::vector<uint8_t>> &codes);
 
     // Compute a new cluster center from assigned codes. codes: All N codes. selected_ids: selected assigned ids.
     // e.g., If selected_ids=[4, 25, 13], then codes[4], codes[25], and codes[13] are averaged by the proposed sparse voting scheme.
-    std::vector<unsigned char> ComputeCenterBySparseVoting(const std::vector<unsigned char> &codes,  // codes.size == N * M
+    std::vector<uint8_t> ComputeCenterBySparseVoting(const std::vector<uint8_t> &codes,  // codes.size == N * M
                                                            const std::vector<std::size_t> &selected_ids);
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<unsigned char> NthCode(const std::vector<unsigned char> &long_code, std::size_t n);
+    std::vector<uint8_t> NthCode(const std::vector<uint8_t> &long_code, std::size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    unsigned char NthCodeMthElement(const std::vector<unsigned char> &long_code, std::size_t n, int m);
+    uint8_t NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, int m);
 
 };
 
