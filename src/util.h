@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTIL_H
+#define UTIL_H
 
 #include <chrono>
 
@@ -20,3 +21,5 @@ class Timer
     }
     double get_time() { return total; }
 };
+
+#endif

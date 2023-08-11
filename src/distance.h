@@ -17,7 +17,7 @@
 // But it doesn't seem drastically fast. Only slightly faster than AVX:
 // (runtime) REF >> SSE >= AVX ~ AVX512
 
-namespace Toy {
+namespace {
 
 // From Faiss.
 // Reference implementation

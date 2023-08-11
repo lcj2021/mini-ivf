@@ -5,19 +5,34 @@ project(Toy)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(test_ivfpq 
+add_executable(test_rii 
+    src/test_rii.cpp
+    src/index_rii.h
+    src/pqkmeans.cpp
+    src/quantizer.cpp
+)
+
+add_executable(test_ivfpq
     src/test_ivfpq.cpp
     src/index_ivfpq.h
     src/pqkmeans.cpp
+    src/quantizer.cpp
 )
 
 add_executable(test_sift1m 
     src/test_sift1m.cpp
-    src/index_ivfpq.h
+    src/index_rii.h
     src/pqkmeans.cpp
+    src/quantizer.cpp
 )
 
 target_compile_options(test_ivfpq PRIVATE
+    -Ofast
+    -march=native
+    -mtune=native
+)
+
+target_compile_options(test_rii PRIVATE
     -Ofast
     -march=native
     -mtune=native
@@ -51,8 +66,12 @@ else()
 endif()
 
 
+target_link_libraries(test_rii PRIVATE
+    ${MPI_CXX_LIBRARIES}
+)
+
 target_link_libraries(test_ivfpq PRIVATE
-    # ${MPI_CXX_LIBRARIES}
+    ${MPI_CXX_LIBRARIES}
 )
 
 target_link_libraries(test_sift1m PRIVATE

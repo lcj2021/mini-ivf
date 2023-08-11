@@ -1,9 +1,8 @@
-#ifndef INDEX_IVFPQ_H
-#define INDEX_IVFPQ_H
+#ifndef INDEX_RII_H
+#define INDEX_RII_H
 
 #include <iostream>
 #include <iomanip>
-#include <algorithm>
 #include <cassert>
 #include <unordered_set>
 #include <fstream>
@@ -14,55 +13,38 @@
 
 namespace Toy {
 
-/**
- * Configuration structure
- * @param N_ the number of data
- * @param D_ the number of dimensions
- * @param W_ the number of bucket involed when searching is performed
- * @param L_ the expected number of candidates involed when searching is performed
- * @param kc, kp the number of coarse quantizer (nlist) and product quantizer's centers (1 << nbits). Default: 100, 256
- * @param mc, mp the number of subspace for coarse quantize and product quantizer. mc must be 1
- * @param dc, dp the dimensions of subspace for coarse quantize and product quantizer. dc must be D_.  dp = D_ / mp
- * @param db_path path to the DB files
- * @param db_prefix the prefix of DB files
- */
-struct IVFPQConfig {
-	size_t N_, D_, W_, L_, kc, kp, mc, mp, dc, dp;
-	// std::string db_prefix;
-	// std::string db_path;
-    IVFPQConfig(size_t N, size_t D, size_t W, size_t L, 
-                size_t kc, size_t kp, 
-                size_t mc, size_t mp, 
-                size_t dc, size_t dp) : N_(N), D_(D), W_(W), L_(L), 
-                kc(kc), kp(kp), mc(mc), mp(mp), dc(dc), dp(dp) {}
-};
 
 struct DistanceTable{
     // Helper structure. This is identical to vec<vec<float>> dt(M, vec<float>(Ks))
     DistanceTable() {}
-    DistanceTable(size_t M, size_t Ks) : kp(Ks), data_(M * Ks) {}
+    DistanceTable(size_t M, size_t Ks) : Ks_(Ks), data_(M * Ks) {}
     void SetVal(size_t m, size_t ks, float val) {
-        data_[m * kp + ks] = val;
+        data_[m * Ks_ + ks] = val;
     }
     float GetVal(size_t m, size_t ks) const {
-        return data_[m * kp + ks];
+        return data_[m * Ks_ + ks];
     }
-    size_t kp;
+    size_t Ks_;
     std::vector<float> data_;
 };
 
-class IndexIVFPQ {
+
+
+class IndexRII {
 public:
-    IndexIVFPQ(const IVFPQConfig& cfg, bool verbose, bool write_trainset);
+    IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords, 
+                        size_t D, size_t nlist, size_t M, size_t nbits, 
+                        bool verbose, bool write_trainset);
 
     void Reconfigure(int nlist, int iter);
-    void populate(const std::vector<std::vector<uint8_t>> &codes, bool update_flag);
-    void train(const std::vector<float>& traindata);
+    void AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_flag);
+    void train();
 
     std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float> &query,
                                                              const std::vector<int> &gt,
                                                              int topk,
-                                                             int L);
+                                                             int L,
+                                                             int nprobe);
     void Clear();
 
     void UpdatePostingLists(size_t num);
@@ -73,7 +55,7 @@ public:
     std::pair<std::vector<size_t>, std::vector<float>> PairVectorToVectorPair(const std::vector<std::pair<size_t, float>> &pair_vec) const;
 
     // Property getter
-    size_t GetN() const {return flattened_codes_.size() / mp;}
+    size_t GetN() const {return flattened_codes_.size() / M_;}
     size_t GetNumList() const {return coarse_centers_.size();}
 
     std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
@@ -84,9 +66,8 @@ public:
     uint8_t NthCodeMthElement(std::size_t list_no, size_t offset, size_t m) const;
     std::vector<uint8_t>  encode(const std::vector<float> &vec) const;
     // Member variables
-    size_t N_, D_, W_, L_, kc, kp, mc, mp, dc, dp;
+    size_t M_, Ks_;
     bool verbose_, write_trainset_;
-
     std::vector<std::vector<std::vector<float>>> codewords_;  // (M, Ks, Ds)
     std::vector<std::vector<uint8_t>> coarse_centers_;  // (NumList, M)
     std::vector<uint8_t> flattened_codes_;  // (N, M) PQ codes are flattened to N * M long array
@@ -100,14 +81,27 @@ public:
 };
 
 
-IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, bool verbose, bool write_trainset)
-    : N_(cfg.N_), D_(cfg.D_), W_(cfg.W_), L_(cfg.L_), 
-    kc(cfg.kc), kp(cfg.kp), mc(cfg.mc), mp(cfg.mp), dc(cfg.dc), dp(cfg.dp)
+IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords, 
+                        size_t D, size_t nlist, size_t M, size_t nbits, 
+                        bool verbose=false, bool write_trainset=false)
 {
     verbose_ = verbose;
     write_trainset_ = write_trainset;
-    std::cout << dc << ' ' << mc << '\n';
-    assert(dc == D_ && mc == 1);
+    const auto &r = codewords;  // codewords must have ndim=3, with non-writable
+    M_ = (size_t) r.size();
+    Ks_ = (size_t) r[0].size();
+    size_t Ds = (size_t) r[0][0].size();
+    codewords_.resize(M_, 
+        std::vector<std::vector<float>>(Ks_, 
+        std::vector<float>(Ds)));
+
+    for (ssize_t m = 0; m < M_; ++m) {
+        for (ssize_t ks = 0; ks < Ks_; ++ks) {
+            for (ssize_t ds = 0; ds < Ds; ++ds) {
+                codewords_[m][ks][ds] = r[m][ks][ds];
+            }
+        }
+    }
 
     if (write_trainset) {
         std::string dataset_name = "sift1m_";
@@ -124,24 +118,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, bool verbose, bool write_trainset
 }
 
 void 
-IndexIVFPQ::train(const std::vector<float>& traindata)
-{
-    size_t Nt_ = traindata.size() / D_;
-    Quantizer::Quantizer* cq = new Quantizer::Quantizer(D_, Nt_, mc, kc, 10, true);
-    cq->fit(traindata, 10, 123);
-    const auto& centers_cq = cq->GetClusterCenters();
-    const auto& labels_cq = cq->GetAssignments();
-    std::vector<size_t> labels_cnt(kc);
-    for (auto label : labels_cq[0]) {
-        labels_cnt[label] ++;
-    }
-    std::cout << *std::max_element(labels_cnt.begin(), labels_cnt.end()) << '\n';
-    std::cout << *std::min_element(labels_cnt.begin(), labels_cnt.end()) << '\n';
-    ::delete cq;
-}
-
-void 
-IndexIVFPQ::Reconfigure(int nlist, int iter)
+IndexRII::Reconfigure(int nlist, int iter)
 {
     assert(0 < nlist);
     assert((size_t) nlist <= GetN());
@@ -159,13 +136,13 @@ IndexIVFPQ::Reconfigure(int nlist, int iter)
     ids_for_clustering.shrink_to_fit();  // For efficient memory usage
 
     std::vector<uint8_t> flattened_codes_randomly_picked;  // size=len_for_clustering
-    flattened_codes_randomly_picked.reserve(len_for_clustering * mp);
+    flattened_codes_randomly_picked.reserve(len_for_clustering * M_);
     for (const auto &id : ids_for_clustering) {  // Pick up vectors to construct a training set
         std::vector<uint8_t> code = NthCode(flattened_codes_, id);
         flattened_codes_randomly_picked.insert(flattened_codes_randomly_picked.end(),
                                                code.begin(), code.end());
     }
-    assert(flattened_codes_randomly_picked.size() == len_for_clustering * mp);
+    assert(flattened_codes_randomly_picked.size() == len_for_clustering * M_);
 
     Timer timer1, timer2;
 
@@ -179,7 +156,7 @@ IndexIVFPQ::Reconfigure(int nlist, int iter)
     // ===== (3) Update coarse centers =====
     coarse_centers_ = clustering_instance.GetClusterCenters();
     assert(coarse_centers_.size() == (size_t) nlist);
-    assert(coarse_centers_[0].size() == mp);
+    assert(coarse_centers_[0].size() == M_);
     timer1.stop();
 
 
@@ -210,8 +187,14 @@ IndexIVFPQ::Reconfigure(int nlist, int iter)
 }
 
 void 
-IndexIVFPQ::populate(const std::vector<std::vector<uint8_t>> &codes, bool update_flag)
+IndexRII::AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_flag)
 {
+    // (1) Add new input codes to flatted_codes. This imply pushes back the elements.
+    // After that, if update_flg=true, (2) update posting lists for the input codes.
+    // Note that update_flag should be true in usual cases. It should be false
+    // if (1) this is the first call of AddCodes (i.e., calling in add_configure()),
+    // of (2) you've decided to call reconfigure() manually after add()
+
     if (update_flag && coarse_centers_.empty()) {
         std::cerr << "Error. reconfigure() must be called before running add(vecs=X, update_posting_lists=True)."
                   << "If this is the first addition, please call add_configure(vecs=X)" << std::endl;
@@ -222,12 +205,12 @@ IndexIVFPQ::populate(const std::vector<std::vector<uint8_t>> &codes, bool update
     const auto &r = codes; // codes must have ndim=2; with non-writeable
     size_t N = (size_t) r.size();
     std::cout << (size_t) r[0].size() << '\n';
-    assert(mp == (size_t) r[0].size());
+    assert(M_ == (size_t) r[0].size());
     size_t N0 = GetN();
-    flattened_codes_.resize( (N0 + N) * mp);
+    flattened_codes_.resize( (N0 + N) * M_);
     for (size_t n = 0; n < N; ++n) {
-        for (size_t m = 0; m < mp; ++m) {
-            flattened_codes_[ (N0 + n) * mp + m] = r[n][m];
+        for (size_t m = 0; m < M_; ++m) {
+            flattened_codes_[ (N0 + n) * M_ + m] = r[n][m];
         }
     }
     if (verbose_) {
@@ -243,10 +226,11 @@ IndexIVFPQ::populate(const std::vector<std::vector<uint8_t>> &codes, bool update
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::query(const std::vector<float> &query,
+IndexRII::query(const std::vector<float> &query,
                                             const std::vector<int> &gt,
                                             int topk,
-                                            int L)
+                                            int L,
+                                            int nprobe)
 {
     assert((size_t) topk <= GetN());
     assert(topk <= L && (size_t) L <= GetN());
@@ -265,7 +249,14 @@ IndexIVFPQ::query(const std::vector<float> &query,
     // Timer timer1, timer2;
     // ===== (3) Partial sort the coarse results. =====
     // timer1.start();
-    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W_, scores_coarse.end(),
+    size_t w = (size_t) std::round((double) L * GetNumList() / GetN()) + 3;  // Top w posting lists to be considered. +3 just in case. 
+    if (nlist < w) {  // If w is bigger than the original nlist, let's set back nlist
+        w = nlist;
+    }
+
+    w = nprobe;
+    // w = nlist;
+    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
                       [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
     // timer1.stop();
 
@@ -323,7 +314,7 @@ IndexIVFPQ::query(const std::vector<float> &query,
             write_r << std::fixed << std::setprecision(4) << (double)br / posting_lists_[no].size() << ",";
         }
 
-        if ( (size_t) coarse_cnt == W_ && scores.size() >= (unsigned long) topk) {
+        if ( (size_t) coarse_cnt == w && scores.size() >= (unsigned long) topk) {
             // ===== (8) Sort them =====
             std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
                                 [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
@@ -348,7 +339,7 @@ IndexIVFPQ::query(const std::vector<float> &query,
 }
 
 void 
-IndexIVFPQ::Clear()
+IndexRII::Clear()
 {
     coarse_centers_.clear();
     flattened_codes_.clear();
@@ -356,7 +347,7 @@ IndexIVFPQ::Clear()
 }
 
 void 
-IndexIVFPQ::UpdatePostingLists(size_t num)
+IndexRII::UpdatePostingLists(size_t num)
 {
     // Update (add) identifiers to posting lists, from codes[start] to codes[start + num -1]
     // This just add IDs, so be careful to call this (e.g., the same IDs will be added if you call
@@ -420,14 +411,14 @@ IndexIVFPQ::UpdatePostingLists(size_t num)
 }
 
 DistanceTable 
-IndexIVFPQ::DTable(const std::vector<float> &vec) const
+IndexRII::DTable(const std::vector<float> &vec) const
 {
     const auto &v = vec;
     size_t Ds = codewords_[0][0].size();
-    assert((size_t) v.size() == mp * Ds);
-    DistanceTable dtable(mp, kp);
-    for (size_t m = 0; m < mp; ++m) {
-        for (size_t ks = 0; ks < kp; ++ks) {
+    assert((size_t) v.size() == M_ * Ds);
+    DistanceTable dtable(M_, Ks_);
+    for (size_t m = 0; m < M_; ++m) {
+        for (size_t ks = 0; ks < Ks_; ++ks) {
             dtable.SetVal(m, ks, fvec_L2sqr(&(v[m * Ds]), codewords_[m][ks].data(), Ds));
         }
     }
@@ -435,11 +426,11 @@ IndexIVFPQ::DTable(const std::vector<float> &vec) const
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code) const
+IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code) const
 {
-    assert(code.size() == mp);
+    assert(code.size() == M_);
     float dist = 0;
-    for (size_t m = 0; m < mp; ++m) {
+    for (size_t m = 0; m < M_; ++m) {
         uint8_t ks = code[m];
         dist += dtable.GetVal(m, ks);
     }
@@ -447,10 +438,10 @@ IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code)
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flattened_codes, size_t n) const
+IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flattened_codes, size_t n) const
 {
     float dist = 0;
-    for (size_t m = 0; m < mp; ++m) {
+    for (size_t m = 0; m < M_; ++m) {
         uint8_t ks = NthCodeMthElement(flattened_codes, n, m);
         dist += dtable.GetVal(m, ks);
     }
@@ -458,10 +449,10 @@ IndexIVFPQ::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flatt
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) const
+IndexRII::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) const
 {
     float dist = 0;
-    for (size_t m = 0; m < mp; ++m) {
+    for (size_t m = 0; m < M_; ++m) {
         uint8_t ks = NthCodeMthElement(list_no, offset, m);
         dist += dtable.GetVal(m, ks);
     }
@@ -469,13 +460,13 @@ IndexIVFPQ::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) co
 }
 
 std::vector<uint8_t> 
-IndexIVFPQ::encode(const std::vector<float> &vec) const
+IndexRII::encode(const std::vector<float> &vec) const
 {
-    std::vector<uint8_t> code(mp);
-    for (std::size_t m = 0; m < mp; ++m) {
+    std::vector<uint8_t> code(M_);
+    for (std::size_t m = 0; m < M_; ++m) {
         uint8_t min_idx = 0;
         float min_dist = std::numeric_limits<float>::max();
-        for (std::size_t ks = 0; ks < kp; ++ks) {
+        for (std::size_t ks = 0; ks < Ks_; ++ks) {
             float dist = fvec_L2sqr(vec.data(), codewords_[m][ks].data(), vec.size());
             if (dist < min_dist) {
                 min_dist = dist;
@@ -488,7 +479,7 @@ IndexIVFPQ::encode(const std::vector<float> &vec) const
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > &pair_vec) const
+IndexRII::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > &pair_vec) const
 {
     std::pair<std::vector<size_t>, std::vector<float>> vec_pair(std::vector<size_t>(pair_vec.size()), std::vector<float>(pair_vec.size()));
     for(size_t n = 0, N = pair_vec.size(); n < N; ++n) {
@@ -499,28 +490,28 @@ IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > 
 }
 
 std::vector<uint8_t> 
-IndexIVFPQ::get_single_code(size_t list_no, size_t offset) const
+IndexRII::get_single_code(size_t list_no, size_t offset) const
 {
-    return std::vector<uint8_t>(codes_[list_no].begin() + offset * mp, 
-                            codes_[list_no].begin() + (offset + 1) * mp);
+    return std::vector<uint8_t>(codes_[list_no].begin() + offset * M_, 
+                            codes_[list_no].begin() + (offset + 1) * M_);
 }
 
 std::vector<uint8_t> 
-IndexIVFPQ::NthCode(const std::vector<uint8_t> &long_code, size_t n) const
+IndexRII::NthCode(const std::vector<uint8_t> &long_code, size_t n) const
 {
-    return std::vector<uint8_t>(long_code.begin() + n * mp, long_code.begin() + (n + 1) * mp);
+    return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
 uint8_t 
-IndexIVFPQ::NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const
+IndexRII::NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const
 {
-    return long_code[ n * mp + m];
+    return long_code[ n * M_ + m];
 }
 
 uint8_t 
-IndexIVFPQ::NthCodeMthElement(size_t list_no, size_t offset, size_t m) const
+IndexRII::NthCodeMthElement(size_t list_no, size_t offset, size_t m) const
 {
-    return codes_[list_no][ offset * mp + m];
+    return codes_[list_no][ offset * M_ + m];
 }
 
 } // namespace Toy

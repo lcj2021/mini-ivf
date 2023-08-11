@@ -3,8 +3,8 @@
 #include <numeric>
 
 #include "hdf5_io.h"
-#include "index_ivfpq.h"
-#include "product_quantizer.h"
+#include "index_rii.h"
+#include "quantizer.h"
 #include "util.h"
 
 int main() {
@@ -22,15 +22,18 @@ int main() {
     std::vector<int> gt;
     load_from_file(gt, "../../dataset/deep-image-96-angular.hdf5", "neighbors");
 
-    ProductQuantizer PQ(D, 32, 8);
-    auto & codewords = PQ.fit(database, 1);
+    // ProductQuantizer PQ(D, 32, 8);
+    // auto & codewords = PQ.fit(database, 1);
+    Quantizer::Quantizer CQ(D, nb, 32, 1LL << 8, 10, true);
+    CQ.fit(database, 10, 123);
+    const auto& codewords_cq = CQ.GetClusterCenters();
 
     // a reasonable number of centroids to index nb vectors
     int ncentroids = 25;
     // nprobe
     int nprobe = 10;
-    Toy::IndexIVFPQ index(codewords, D, ncentroids, 32, 8, true);
-    index.AddCodes(PQ.encode(database), false);
+    Toy::indexRII index(codewords_cq, D, ncentroids, 32, 8, true);
+    index.AddCodes(CQ.encode(database), false);
     index.Reconfigure(ncentroids, 5);
 
     puts("Index find kNN!");
