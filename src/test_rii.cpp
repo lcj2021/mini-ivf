@@ -12,14 +12,14 @@ int main() {
     // dimension of the vectors to index
     size_t D = 64;
     // size of the database we plan to index
-    size_t nb = 1000'000;
+    size_t nb = 10'000;
     // make a set of nt training vectors in the unit cube (could be the database)
-    size_t nt = 15'000;
+    size_t nt = 15'00;
     // size of the queries we plan to search
     int nq = 200;
 
     // a reasonable number of centroids to index nb vectors
-    int ncentroids = 100;
+    int ncentroids = 25;
     // nprobe
     int nprobe = 10;
 
@@ -36,11 +36,9 @@ int main() {
         }
     }
 
-    // ProductQuantizer PQ(D, 16, 8);
-    // auto& codewords = PQ.fit(trainvecs, 10);
-    Quantizer::Quantizer CQ(D, nt, 16, 1LL << 8, 10, true);
+    Quantizer::Quantizer CQ(D, nt, 64, 1LL << 8, 10, true);
     CQ.fit(trainvecs_flat, 10, 123);
-    const auto& codewords_cq = CQ.GetClusterCenters();
+    const auto& codewords_cq = CQ.get_centroids();
     // assert(codewords.size() == codewords_cq.size());
     // assert(codewords[0].size() == codewords_cq[0].size());
     // assert(codewords[0].size() == codewords_cq[0].size());
@@ -52,10 +50,10 @@ int main() {
             database[i][j] = distrib(rng);
         }
     }
-    // Toy::IndexRII index(codewords, D, ncentroids, 16, 8, true, false);
-    // index.AddCodes(PQ.encode(database), false);
-    Toy::IndexRII index(codewords_cq, D, ncentroids, 16, 8, true, false);
-    index.AddCodes(CQ.encode(database), false);
+    Toy::IndexRII index(codewords_cq, D, ncentroids, 16, 8, true, true);
+    const auto& encodewords = CQ.encode(database);
+    std::cout << "encodewords[0].size(): " << encodewords[0].size() << '\n';
+    index.AddCodes(encodewords, false);
     index.Reconfigure(ncentroids, 5);
 
     // searching the database

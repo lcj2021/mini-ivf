@@ -20,10 +20,10 @@ public:
     int predict_one(const std::vector<uint8_t> &pyvector);
     void fit(const std::vector<uint8_t> &pydata);  // pydata is a long array. pydata.size == N * M
 
-    const std::vector<int> GetAssignments();
+    const std::vector<int> get_assignments();
 
-    void SetClusterCenters(const std::vector<std::vector<uint8_t>> &centers_new);
-    std::vector<std::vector<uint8_t>> GetClusterCenters();
+    void set_centroids(const std::vector<std::vector<uint8_t>> &centers_new);
+    std::vector<std::vector<uint8_t>> get_centroids();
     int K() const { return K_; }
     int Iteration() const { return iteration_; }
     bool Verbose() const { return verbose_; }
@@ -61,10 +61,10 @@ private:
                                                            const std::vector<std::size_t> &selected_ids);
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<uint8_t> NthCode(const std::vector<uint8_t> &long_code, std::size_t n);
+    std::vector<uint8_t> nth_vector(const std::vector<uint8_t> &long_code, std::size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    uint8_t NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, int m);
+    uint8_t nth_vector_mth_element(const std::vector<uint8_t> &long_code, std::size_t n, int m);
 
 };
 

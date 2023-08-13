@@ -24,24 +24,24 @@ int main() {
     load_from_file(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
 
     size_t M = 64, nbits = 8;
-    // ProductQuantizer PQ(D, M, nbits);
-    // const auto& codewords = PQ.fit(database, 5);
+
     Quantizer::Quantizer CQ(D, nb, M, 1LL << nbits, 5, true);
     CQ.fit(database, 5, 123);
-    const auto& codewords_cq = CQ.GetClusterCenters();
+    const auto& codewords_cq = CQ.get_centroids();
 
     // a reasonable number of centroids to index nb vectors
     int ncentroids = 100;
     // nprobe
-    int nprobe = 6;
+    int nprobe = 100;
     // Toy::IndexRII index(codewords, D, ncentroids, M, nbits, true, false);
     // index.AddCodes(PQ.encode(database), false);
-    Toy::IndexRII index(codewords_cq, D, ncentroids, M, nbits, true, false);
-    index.AddCodes(CQ.encode(database), false);
+    Toy::IndexRII index(codewords_cq, D, ncentroids, M, nbits, true, true);
+    const auto& encodewords = CQ.encode(database);
+    index.AddCodes(encodewords, false);
     index.Reconfigure(ncentroids, 5);
 
     puts("Index find kNN!");
-    // Recall@1
+    // Recall@k
     int k = 100;
     nq = 10'000;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));

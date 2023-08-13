@@ -63,7 +63,7 @@ namespace {
             // std::cout << iter_count << '\n';
             // Assign each observation to the nearest centroid
             double errors_sum = 0.0;
-#pragma omp parallel for
+        #pragma omp parallel for
             for (int i = 0; i < N; ++i) {
                 float min_dist;
                 std::tie(labels[i], min_dist) = nearest_center(obs[i], centroids);

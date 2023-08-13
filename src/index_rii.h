@@ -60,13 +60,13 @@ public:
 
     std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<uint8_t> NthCode(const std::vector<uint8_t> &long_code, size_t n) const;
+    std::vector<uint8_t> nth_vector(const std::vector<uint8_t> &long_code, size_t n) const;
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    uint8_t NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const;
-    uint8_t NthCodeMthElement(std::size_t list_no, size_t offset, size_t m) const;
+    uint8_t nth_vector_mth_element(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const;
+    uint8_t nth_vector_mth_element(std::size_t list_no, size_t offset, size_t m) const;
     std::vector<uint8_t>  encode(const std::vector<float> &vec) const;
     // Member variables
-    size_t M_, Ks_;
+    size_t M_, Ks_, Ds_;
     bool verbose_, write_trainset_;
     std::vector<std::vector<std::vector<float>>> codewords_;  // (M, Ks, Ds)
     std::vector<std::vector<uint8_t>> coarse_centers_;  // (NumList, M)
@@ -75,7 +75,8 @@ public:
     std::vector<std::vector<int>> posting_lists_;  // (NumList, any)
     std::vector<std::vector<float>> posting_dist_lists_;  // (NumList, any)
 
-    std::ofstream write_centroidword_distribution;
+    std::ofstream write_centroid_word;
+    std::ofstream write_centroid_distribution;
     std::ofstream write_l, write_r;
     std::ofstream write_queryword;
 };
@@ -90,14 +91,14 @@ IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords
     const auto &r = codewords;  // codewords must have ndim=3, with non-writable
     M_ = (size_t) r.size();
     Ks_ = (size_t) r[0].size();
-    size_t Ds = (size_t) r[0][0].size();
+    Ds_ = (size_t) r[0][0].size();
     codewords_.resize(M_, 
         std::vector<std::vector<float>>(Ks_, 
-        std::vector<float>(Ds)));
+        std::vector<float>(Ds_)));
 
     for (ssize_t m = 0; m < M_; ++m) {
         for (ssize_t ks = 0; ks < Ks_; ++ks) {
-            for (ssize_t ds = 0; ds < Ds; ++ds) {
+            for (ssize_t ds = 0; ds < Ds_; ++ds) {
                 codewords_[m][ks][ds] = r[m][ks][ds];
             }
         }
@@ -105,10 +106,11 @@ IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords
 
     if (write_trainset) {
         std::string dataset_name = "sift1m_";
-        write_centroidword_distribution = std::ofstream(dataset_name + "centroidword_distribution.csv");
-        write_l = std::ofstream(dataset_name + "write_l.csv");
-        write_r = std::ofstream(dataset_name + "write_r.csv");
-        write_queryword = std::ofstream(dataset_name + "write_queryword.csv");
+        write_centroid_word = std::ofstream(dataset_name + "centroid_word.csv");
+        write_centroid_distribution = std::ofstream(dataset_name + "centroid_distribution.csv");
+        write_l = std::ofstream(dataset_name + "l.csv");
+        write_r = std::ofstream(dataset_name + "r.csv");
+        write_queryword = std::ofstream(dataset_name + "queryword.csv");
     }
 
     if (verbose_) {
@@ -138,7 +140,7 @@ IndexRII::Reconfigure(int nlist, int iter)
     std::vector<uint8_t> flattened_codes_randomly_picked;  // size=len_for_clustering
     flattened_codes_randomly_picked.reserve(len_for_clustering * M_);
     for (const auto &id : ids_for_clustering) {  // Pick up vectors to construct a training set
-        std::vector<uint8_t> code = NthCode(flattened_codes_, id);
+        std::vector<uint8_t> code = nth_vector(flattened_codes_, id);
         flattened_codes_randomly_picked.insert(flattened_codes_randomly_picked.end(),
                                                code.begin(), code.end());
     }
@@ -154,7 +156,7 @@ IndexRII::Reconfigure(int nlist, int iter)
 
 
     // ===== (3) Update coarse centers =====
-    coarse_centers_ = clustering_instance.GetClusterCenters();
+    coarse_centers_ = clustering_instance.get_centroids();
     assert(coarse_centers_.size() == (size_t) nlist);
     assert(coarse_centers_[0].size() == M_);
     timer1.stop();
@@ -256,8 +258,10 @@ IndexRII::query(const std::vector<float> &query,
 
     w = nprobe;
     // w = nlist;
-    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
-                      [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
+    if (!write_trainset_) {
+        std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
+                    [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
+    }
     // timer1.stop();
 
     std::unordered_set<int> gt_set;
@@ -267,7 +271,7 @@ IndexRII::query(const std::vector<float> &query,
             gt_set.insert(gt_v[i]);
         }
         const auto& queryword = encode(query);
-        for (const auto& word : query) {
+        for (const auto& word : queryword) {
             write_queryword << (int)word << ",";
         }
         write_queryword << std::endl;
@@ -356,19 +360,18 @@ IndexRII::UpdatePostingLists(size_t num)
 
     // ===== (1) Construct a dummy pqkmeans class for computing Symmetric Distance =====
     pqkmeans::PQKMeans clustering_instance(codewords_, (int)GetNumList(), 0, true);
-    clustering_instance.SetClusterCenters(coarse_centers_);
+    clustering_instance.set_centroids(coarse_centers_);
     // distance_matrices_among_codewords_ = clustering_instance.distance_matrices_among_codewords_;
 
     // ===== (2) Update posting lists =====
     std::vector<size_t> assign(num);
 
-    std::mutex mutex;
 #pragma omp parallel for
     for (size_t n = 0; n < num; ++n) {
-        const auto &nth_code = NthCode(flattened_codes_, n);
+        const auto &nth_code = nth_vector(flattened_codes_, n);
         assign[n] = clustering_instance.predict_one(nth_code);
+        #pragma omp critical
         {
-            std::lock_guard<std::mutex> lock(mutex);
             posting_lists_[assign[n]].emplace_back(n);
             posting_dist_lists_[assign[n]].emplace_back(0);
         }
@@ -381,31 +384,35 @@ IndexRII::UpdatePostingLists(size_t num)
         auto &plist = posting_lists_[no];
         const auto &center = coarse_centers_[no];
         std::sort(plist.begin(), plist.end(), [&](const auto &a, const auto& b) {
-            return clustering_instance.SymmetricDistance(center, NthCode(flattened_codes_, a))
-                < clustering_instance.SymmetricDistance(center, NthCode(flattened_codes_, b));
+            return clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, a))
+                < clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, b));
         });
         auto &pdlist = posting_dist_lists_[no];
+// #pragma omp parallel for 
+// [Bug] No parallel here !
         for (size_t i = 0; i < pdlist.size(); ++i) {
-            pdlist[i] = clustering_instance.SymmetricDistance(center, NthCode(flattened_codes_, plist[i]));
+            pdlist[i] = clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, plist[i]));
         }
         for (const auto& id : plist) {
-            const auto& nth_code = NthCode(flattened_codes_, id);
+            const auto& nth_code = nth_vector(flattened_codes_, id);
             codes_[no].insert(codes_[no].end(), nth_code.begin(), nth_code.end());
         }
     }
 
     if (write_trainset_) {
-        auto &write = write_centroidword_distribution;
+        auto &write_d = write_centroid_distribution;
+        auto &write_w = write_centroid_word;
         for (int no = 0; no < nlist; ++no) {
             const auto& centroidword = coarse_centers_[no];
-            for (const auto& word : centroidword) write << (int)word << ",";
+            for (const auto& word : centroidword) write_w << (int)word << ",";
             const auto& pdlist = posting_dist_lists_[no];
-            size_t len = pdlist.size();
-            size_t step = len / 20;
-            for (size_t i = 0; i < len; i += step) {
-                write << pdlist[i] << ",";
+            size_t step = pdlist.size() / 20;
+            for (size_t i = 0; i < 20; ++i) {
+                size_t idx = i * step;
+                write_d << pdlist[idx] << ",";
             }
-            write << std::endl;
+            write_d << std::endl;
+            write_w << std::endl;
         }
     }
 }
@@ -442,7 +449,7 @@ IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flatten
 {
     float dist = 0;
     for (size_t m = 0; m < M_; ++m) {
-        uint8_t ks = NthCodeMthElement(flattened_codes, n, m);
+        uint8_t ks = nth_vector_mth_element(flattened_codes, n, m);
         dist += dtable.GetVal(m, ks);
     }
     return dist;
@@ -453,7 +460,7 @@ IndexRII::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) cons
 {
     float dist = 0;
     for (size_t m = 0; m < M_; ++m) {
-        uint8_t ks = NthCodeMthElement(list_no, offset, m);
+        uint8_t ks = nth_vector_mth_element(list_no, offset, m);
         dist += dtable.GetVal(m, ks);
     }
     return dist;
@@ -464,10 +471,10 @@ IndexRII::encode(const std::vector<float> &vec) const
 {
     std::vector<uint8_t> code(M_);
     for (std::size_t m = 0; m < M_; ++m) {
-        uint8_t min_idx = 0;
+        uint8_t min_idx = -1;
         float min_dist = std::numeric_limits<float>::max();
         for (std::size_t ks = 0; ks < Ks_; ++ks) {
-            float dist = fvec_L2sqr(vec.data(), codewords_[m][ks].data(), vec.size());
+            float dist = fvec_L2sqr(const_cast<const float*>(vec.data() + Ds_), codewords_[m][ks].data(), Ds_);
             if (dist < min_dist) {
                 min_dist = dist;
                 min_idx = ks;
@@ -497,19 +504,19 @@ IndexRII::get_single_code(size_t list_no, size_t offset) const
 }
 
 std::vector<uint8_t> 
-IndexRII::NthCode(const std::vector<uint8_t> &long_code, size_t n) const
+IndexRII::nth_vector(const std::vector<uint8_t> &long_code, size_t n) const
 {
     return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
 uint8_t 
-IndexRII::NthCodeMthElement(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const
+IndexRII::nth_vector_mth_element(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const
 {
     return long_code[ n * M_ + m];
 }
 
 uint8_t 
-IndexRII::NthCodeMthElement(size_t list_no, size_t offset, size_t m) const
+IndexRII::nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const
 {
     return codes_[list_no][ offset * M_ + m];
 }

@@ -11,15 +11,16 @@
 
 size_t D = 64;              // dimension of the vectors to index
 size_t nb = 1000'000;       // size of the database we plan to index
-size_t nt = 15'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t nt = 150'000;         // make a set of nt training vectors in the unit cube (could be the database)
 int nq = 200;               // size of the queries we plan to search
 int ncentroids = 100;
 int nprobe = 10;
+size_t mp = 16;
 
 Toy::IVFPQConfig cfg(nb, D, nprobe, nb / 50, 
                     ncentroids, 256, 
-                    1, 32, 
-                    D, D / 32);
+                    1, mp, 
+                    D, D / mp);
 
 int main() {
     std::mt19937 rng;
@@ -37,14 +38,16 @@ int main() {
 
     // populating (adding) the database
     std::vector<std::vector<float>> database(nb, std::vector<float>(D));
+    std::vector<float> database_flat(nb * D);
     for (size_t i = 0; i < nb; ++i) {
         for (size_t j = 0; j < D; ++j) {
             database[i][j] = distrib(rng);
+            database_flat[i * D + j] = database[i][j];
         }
     }
     Toy::IndexIVFPQ index(cfg, true, false);
-    index.train(trainvecs_flat);
-    // index.populate(CQ.encode(database), false);
+    index.train(trainvecs_flat, 123, false);
+    index.populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
 
     // // searching the database

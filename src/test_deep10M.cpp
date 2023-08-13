@@ -26,7 +26,7 @@ int main() {
     // auto & codewords = PQ.fit(database, 1);
     Quantizer::Quantizer CQ(D, nb, 32, 1LL << 8, 10, true);
     CQ.fit(database, 10, 123);
-    const auto& codewords_cq = CQ.GetClusterCenters();
+    const auto& codewords_cq = CQ.get_centroids();
 
     // a reasonable number of centroids to index nb vectors
     int ncentroids = 25;

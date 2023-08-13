@@ -19,10 +19,10 @@ public:
 
     int predict_one(const std::vector<float> &vec, size_t m);
     void fit(const std::vector<float> &rawdata, int iter, int seed);    // pydata.shape == N * D
-    const std::vector<std::vector<int>> GetAssignments();
+    const std::vector<std::vector<int>>& get_assignments();
 
-    void SetClusterCenters(const std::vector<std::vector<std::vector<float>>> &centers_new);
-    const std::vector<std::vector<std::vector<float>>>& GetClusterCenters();
+    void set_centroids(const std::vector<std::vector<std::vector<float>>> &centers_new);
+    const std::vector<std::vector<std::vector<float>>>& get_centroids();
     std::vector<std::vector<uint8_t>> encode(const std::vector<float>& rawdata);
     std::vector<std::vector<uint8_t>> encode(const std::vector<std::vector<float>>& rawdata);
 
@@ -42,10 +42,10 @@ private:
     std::vector<std::vector<int>> assignments_;  
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<float> NthCode(const std::vector<float> &long_code, size_t n);
+    std::vector<float> nth_vector(const std::vector<float> &long_code, size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    std::vector<float> NthCodeMthElement(const std::vector<float> &long_code, size_t n, int m);
+    std::vector<float> nth_vector_mth_element(const std::vector<float> &long_code, size_t n, int m);
 
 };
 

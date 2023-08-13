@@ -89,7 +89,7 @@ void PQKMeans::fit(const std::vector<uint8_t> &pydata) {
 
 #pragma omp parallel for
         for(size_t n = 0; n < N; ++n) {
-            std::pair<size_t, float> min_k_dist = FindNearetCenterLinear(NthCode(pydata, n), centers_old);
+            std::pair<size_t, float> min_k_dist = FindNearetCenterLinear(nth_vector(pydata, n), centers_old);
             assignments_[n] = (int) min_k_dist.first;
             errors[n] = min_k_dist.second;
         }
@@ -133,17 +133,17 @@ void PQKMeans::fit(const std::vector<uint8_t> &pydata) {
     centers_ = centers_new;
 }
 
-const std::vector<int> PQKMeans::GetAssignments()
+const std::vector<int> PQKMeans::get_assignments()
 {
     return assignments_;
 }
 
-std::vector<std::vector<uint8_t>> PQKMeans::GetClusterCenters()
+std::vector<std::vector<uint8_t>> PQKMeans::get_centroids()
 {
     return centers_;
 }
 
-void PQKMeans::SetClusterCenters(const std::vector<std::vector<uint8_t>> &centers_new)
+void PQKMeans::set_centroids(const std::vector<std::vector<uint8_t>> &centers_new)
 {
     assert(centers_new.size() == (size_t) K_);
     centers_ = centers_new;
@@ -186,7 +186,7 @@ void PQKMeans::InitializeCentersByRandomPicking(const std::vector<uint8_t> &code
     std::mt19937 default_random_engine(0);
     std::shuffle(ids.begin(), ids.end(), default_random_engine);
     for (size_t k = 0; k < (size_t) K; ++k) {
-        (*centers)[k] = NthCode(codes, ids[k]);
+        (*centers)[k] = nth_vector(codes, ids[k]);
     }
 
 }
@@ -230,7 +230,7 @@ std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uin
         // Scan the assigned codes, then create a freq-histogram
         std::vector<int> frequency_histogram(Ks, 0);
         for (const auto &id : selected_ids) {
-            ++frequency_histogram[ NthCodeMthElement(codes, id, m) ];
+            ++frequency_histogram[ nth_vector_mth_element(codes, id, m) ];
         }
 
         // Vote the freq-histo weighted by ditance matrices
@@ -260,12 +260,12 @@ std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uin
     return average_code;
 }
 
-std::vector<uint8_t> PQKMeans::NthCode(const std::vector<uint8_t> &long_code, size_t n)
+std::vector<uint8_t> PQKMeans::nth_vector(const std::vector<uint8_t> &long_code, size_t n)
 {
     return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
-uint8_t PQKMeans::NthCodeMthElement(const std::vector<uint8_t> &long_code, size_t n, int m)
+uint8_t PQKMeans::nth_vector_mth_element(const std::vector<uint8_t> &long_code, size_t n, int m)
 {
     return long_code[ n * M_ + m];
 }

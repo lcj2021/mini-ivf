@@ -15,7 +15,7 @@ Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, int itr=10, bool ve
     assert(D_ % M_ == 0);
     Ds_ = D_ / M_;
 
-    if (256 < K_) {
+    if (M_ > 1 && K_ > 256) {
         std::cerr << "Error. K_ is too large. "
                   << "Currently, we only support PQ code with K_ <= 256 "
                   << "so that each subspace is represented by uint8_t (8 bit)"
@@ -43,9 +43,9 @@ int Quantizer::predict_one(const std::vector<float> &vec, size_t m)
 }
 
 void
-Quantizer::fit(const std::vector<float> &rawdata, int iter = 20, int seed = 123) 
+Quantizer::fit(const std::vector<float> &traindata, int iter = 20, int seed = 123) 
 {
-    assert(N_ == rawdata.size() / D_);
+    assert(N_ == traindata.size() / D_);
     assert(K_ < N_ && "the number of training vector should be more than K_");
 
     // srand(seed);
@@ -54,16 +54,13 @@ Quantizer::fit(const std::vector<float> &rawdata, int iter = 20, int seed = 123)
         std::cout << "iter: " << iter << ", seed: " << seed << std::endl;
     }
 
-    std::vector<size_t> ids(N_);
-    size_t Nt = std::min(N_, (size_t)100'000);
+    auto traindata_trim = traindata;
+    // traindata_trim.resize(std::min((size_t)100'000, N_) * D_);
+    size_t Nt = traindata_trim.size() / D_;
     std::vector<std::vector<float>> train_vecs(Nt, std::vector<float>(D_));
-    std::iota(ids.begin(), ids.end(), 0); // 0, 1, 2, ..., codes.size()-1
-    std::mt19937 default_random_engine(0);
-    std::shuffle(ids.begin(), ids.end(), default_random_engine);
-    for (std::size_t k = 0; k < Nt; ++k) {
-        size_t id = ids[k];
-        std::copy(rawdata.begin() + id * D_, rawdata.begin() + (id + 1) * D_, 
-                    train_vecs[k].begin());
+    for (std::size_t n = 0; n < Nt; ++n) {
+        std::copy(traindata_trim.begin() + n * D_, traindata_trim.begin() + (n + 1) * D_, 
+                    train_vecs[n].begin());
     }
 
     // Perform k-means iterations for each subspace
@@ -86,16 +83,16 @@ Quantizer::fit(const std::vector<float> &rawdata, int iter = 20, int seed = 123)
     }
 }
 
-const std::vector<std::vector<int>> 
-Quantizer::GetAssignments() {return assignments_;}
+const std::vector<std::vector<int>>&
+Quantizer::get_assignments() {return assignments_;}
 
 const std::vector<std::vector<std::vector<float>>>&
-Quantizer::GetClusterCenters() {return centers_;}
+Quantizer::get_centroids() {return centers_;}
 
 void 
-Quantizer::SetClusterCenters(const std::vector<std::vector<std::vector<float>>> &centers_new)
+Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>> &centers_new)
 {
-    assert(centers_new.size() == (size_t) M_);
+    assert(centers_new.size() == M_);
     centers_ = centers_new;
 }
 
@@ -118,8 +115,7 @@ Quantizer::encode(const std::vector<std::vector<float>>& rawdata)
         }
 #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            const std::vector<float>& vec = vecs_sub[i];        // shape: 1 x Ds_
-            auto [min_idx, min_dist] = nearest_center(vec, centers_[m]);
+            auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
@@ -138,26 +134,27 @@ Quantizer::encode(const std::vector<float>& rawdata)
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
         std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));
+#pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
             std::copy_n(rawdata.begin() + i * D_ + m * Ds_, Ds_, vecs_sub[i].begin());
         }
+#pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            const std::vector<float>& vec = vecs_sub[i];        // shape: 1 x Ds_
-            auto [min_idx, min_dist] = nearest_center(vec, centers_[m]);
+            auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
     return codes;
 }
 
-std::vector<float> Quantizer::NthCode(const std::vector<float> &long_code, size_t n)
+std::vector<float> Quantizer::nth_vector(const std::vector<float> &long_code, size_t n)
 {
     return std::vector<float>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 // Each code: D = M_ * Ds_
 std::vector<float>
-Quantizer::NthCodeMthElement(const std::vector<float> &long_code, size_t n, int m)
+Quantizer::nth_vector_mth_element(const std::vector<float> &long_code, size_t n, int m)
 {
     return std::vector<float>(long_code.begin() + n * D_ + m * Ds_, 
                             long_code.begin() + n * D_ + (m + 1) * Ds_);
