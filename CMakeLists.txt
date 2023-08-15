@@ -26,8 +26,8 @@ add_executable(test_rii_sift1m
     src/quantizer.cpp
 )
 
-add_executable(test_ivf_sift1m 
-    src/test_ivf_sift1m.cpp
+add_executable(test_ivfpq_sift1m 
+    src/test_ivfpq_sift1m.cpp
     src/index_ivfpq.h
     src/pqkmeans.cpp
     src/quantizer.cpp
@@ -51,7 +51,7 @@ target_compile_options(test_rii_sift1m PRIVATE
     -mtune=native
 )
 
-target_compile_options(test_ivf_sift1m PRIVATE
+target_compile_options(test_ivfpq_sift1m PRIVATE
     -Ofast
     -march=native
     -mtune=native
@@ -99,7 +99,7 @@ target_link_libraries(test_rii_sift1m PRIVATE
     OpenMP::OpenMP_CXX
 )
 
-target_link_libraries(test_ivf_sift1m PRIVATE
+target_link_libraries(test_ivfpq_sift1m PRIVATE
     ${HDF5_LIBRARIES}
     ${MPI_CXX_LIBRARIES}
     OpenMP::OpenMP_CXX

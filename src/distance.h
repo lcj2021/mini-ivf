@@ -218,8 +218,8 @@ static const std::string g_simd_architecture = "sse";
 
 
 // This function is from Faiss
-// SSE implementation
-float fvec_L2sqr (const float *x, const float *y, size_t d)
+// SSE implementation. Unroot!
+float fvec_L2sqr(const float *x, const float *y, size_t d)
 {
     __m128 msum1 = _mm_setzero_ps();
 

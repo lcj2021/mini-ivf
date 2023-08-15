@@ -37,7 +37,7 @@ PQKMeans::PQKMeans(std::vector<std::vector<std::vector<float> > > codewords, int
     }
 }
 
-int PQKMeans::predict_one(const std::vector<uint8_t> &pyvector)
+int PQKMeans::predict_one(const std::vector<uint8_t>& pyvector)
 {
     assert(pyvector.size() == M_);
     std::pair<size_t, float> nearest_one = FindNearetCenterLinear(pyvector, centers_);
@@ -46,7 +46,7 @@ int PQKMeans::predict_one(const std::vector<uint8_t> &pyvector)
 
 
 
-void PQKMeans::fit(const std::vector<uint8_t> &pydata) {
+void PQKMeans::fit(const std::vector<uint8_t>& pydata) {
     assert( (size_t) K_ * M_ <= pydata.size());
     assert(pydata.size() % M_ == 0);
     size_t N = pydata.size() / M_;
@@ -67,7 +67,7 @@ void PQKMeans::fit(const std::vector<uint8_t> &pydata) {
     // selected_indices_foreach_center[k] has indices, where
     // each pydata[id] is assigned to k-th center.
     std::vector<std::vector<size_t>> selected_indices_foreach_center(K_);
-    for (auto &selected_indices : selected_indices_foreach_center) {
+    for (auto& selected_indices : selected_indices_foreach_center) {
         selected_indices.reserve( N / K_); // roughly allocate
     }
 
@@ -143,15 +143,15 @@ std::vector<std::vector<uint8_t>> PQKMeans::get_centroids()
     return centers_;
 }
 
-void PQKMeans::set_centroids(const std::vector<std::vector<uint8_t>> &centers_new)
+void PQKMeans::set_centroids(const std::vector<std::vector<uint8_t>>& centers_new)
 {
     assert(centers_new.size() == (size_t) K_);
     centers_ = centers_new;
 }
 
 
-float PQKMeans::SymmetricDistance(const std::vector<uint8_t> &code1,
-                                  const std::vector<uint8_t> &code2)
+float PQKMeans::SymmetricDistance(const std::vector<uint8_t>& code1,
+                                  const std::vector<uint8_t>& code2)
 {
     assert(code1.size() == code2.size());
     assert(code1.size() == M_);
@@ -162,8 +162,8 @@ float PQKMeans::SymmetricDistance(const std::vector<uint8_t> &code1,
     return dist;
 }
 
-float PQKMeans::L2SquaredDistance(const std::vector<float> &vec1,
-                                  const std::vector<float> &vec2)
+float PQKMeans::L2SquaredDistance(const std::vector<float>& vec1,
+                                  const std::vector<float>& vec2)
 {
     assert(vec1.size() == vec2.size());
     float dist = 0;
@@ -175,7 +175,7 @@ float PQKMeans::L2SquaredDistance(const std::vector<float> &vec1,
 
 
 
-void PQKMeans::InitializeCentersByRandomPicking(const std::vector<uint8_t> &codes, int K, std::vector<std::vector<uint8_t> > *centers)
+void PQKMeans::InitializeCentersByRandomPicking(const std::vector<uint8_t>& codes, int K, std::vector<std::vector<uint8_t> > *centers)
 {
     assert(centers != nullptr);
     centers->clear();
@@ -191,8 +191,8 @@ void PQKMeans::InitializeCentersByRandomPicking(const std::vector<uint8_t> &code
 
 }
 
-std::pair<size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector<uint8_t> &query,
-                                                               const std::vector<std::vector<uint8_t> > &codes)
+std::pair<size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector<uint8_t>& query,
+                                                               const std::vector<std::vector<uint8_t> >& codes)
 {
     std::vector<float> dists(codes.size());
 
@@ -220,8 +220,8 @@ std::pair<size_t, float> PQKMeans::FindNearetCenterLinear(const std::vector<uint
 
 
 
-std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uint8_t> &codes, 
-                                                        const std::vector<size_t> &selected_ids)
+std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uint8_t>& codes, 
+                                                        const std::vector<size_t>& selected_ids)
 {
     std::vector<uint8_t> average_code(M_);
     size_t Ks = codewords_[0].size();  // The number of codewords for each subspace
@@ -229,7 +229,7 @@ std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uin
     for (size_t m = 0; m < M_; ++m) {
         // Scan the assigned codes, then create a freq-histogram
         std::vector<int> frequency_histogram(Ks, 0);
-        for (const auto &id : selected_ids) {
+        for (const auto& id : selected_ids) {
             ++frequency_histogram[ nth_vector_mth_element(codes, id, m) ];
         }
 
@@ -260,12 +260,12 @@ std::vector<uint8_t> PQKMeans::ComputeCenterBySparseVoting(const std::vector<uin
     return average_code;
 }
 
-std::vector<uint8_t> PQKMeans::nth_vector(const std::vector<uint8_t> &long_code, size_t n)
+std::vector<uint8_t> PQKMeans::nth_vector(const std::vector<uint8_t>& long_code, size_t n)
 {
     return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
-uint8_t PQKMeans::nth_vector_mth_element(const std::vector<uint8_t> &long_code, size_t n, int m)
+uint8_t PQKMeans::nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, int m)
 {
     return long_code[ n * M_ + m];
 }

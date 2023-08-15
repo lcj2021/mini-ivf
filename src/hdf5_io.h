@@ -37,7 +37,7 @@ hid_t get_hdf5_type<long double>() { return H5T_NATIVE_LDOUBLE; }
 
 // return the dimention of corresponding dataset
 template<typename T>
-std::pair<size_t, size_t> load_from_file(std::vector<T> &data, const std::string &filename, const std::string &dataset_name) {
+std::pair<size_t, size_t> load_from_file(std::vector<T>& data, const std::string &filename, const std::string &dataset_name) {
     hid_t file_id = H5Fopen(filename.data(), H5F_ACC_RDWR, H5P_DEFAULT);
     assert(file_id >= 0 && "Error opening hdf5 file.");
 

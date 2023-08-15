@@ -15,13 +15,13 @@ namespace Quantizer {
 
 class Quantizer {
 public:
-    Quantizer(size_t D, size_t N, size_t M, size_t K, int itr, bool verbose);
+    Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose);
 
-    int predict_one(const std::vector<float> &vec, size_t m);
-    void fit(const std::vector<float> &rawdata, int iter, int seed);    // pydata.shape == N * D
+    int predict_one(const std::vector<float>& vec, size_t m);
+    void fit(const std::vector<float>& rawdata, int iter, int seed);    // pydata.shape == N * D
     const std::vector<std::vector<int>>& get_assignments();
 
-    void set_centroids(const std::vector<std::vector<std::vector<float>>> &centers_new);
+    void set_centroids(const std::vector<std::vector<std::vector<float>>>& centers_new);
     const std::vector<std::vector<std::vector<float>>>& get_centroids();
     std::vector<std::vector<uint8_t>> encode(const std::vector<float>& rawdata);
     std::vector<std::vector<uint8_t>> encode(const std::vector<std::vector<float>>& rawdata);
@@ -32,7 +32,6 @@ private:
     size_t K_;  // the number of centroid for each subspace
     size_t Ds_; // the length/demension of (vector) each subspace
     size_t N_;  // the number of input rawdata (vector)
-    int iteration_;
     bool verbose_;
 
     // centers for clustering. shape = M_ * K_ * Ds_
@@ -42,10 +41,10 @@ private:
     std::vector<std::vector<int>> assignments_;  
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<float> nth_vector(const std::vector<float> &long_code, size_t n);
+    std::vector<float> nth_vector(const std::vector<float>& long_code, size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    std::vector<float> nth_vector_mth_element(const std::vector<float> &long_code, size_t n, int m);
+    std::vector<float> nth_vector_mth_element(const std::vector<float>& long_code, size_t n, int m);
 
 };
 

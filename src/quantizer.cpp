@@ -9,8 +9,8 @@ namespace Quantizer {
  * @param 
 */
 
-Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, int itr=10, bool verbose=false)
-    : D_(D), N_(N), M_(M), K_(K), iteration_(itr), verbose_(verbose)
+Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose=false)
+    : D_(D), N_(N), M_(M), K_(K), verbose_(verbose)
 {
     assert(D_ % M_ == 0);
     Ds_ = D_ / M_;
@@ -35,7 +35,7 @@ Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, int itr=10, bool ve
  * @param vec:  shape = Ds_
  * @param m:    m-th subspace
 */
-int Quantizer::predict_one(const std::vector<float> &vec, size_t m)
+int Quantizer::predict_one(const std::vector<float>& vec, size_t m)
 {
     assert(vec.size() == Ds_);
     std::pair<size_t, float> nearest_one = nearest_center(vec, centers_[m]);
@@ -43,7 +43,7 @@ int Quantizer::predict_one(const std::vector<float> &vec, size_t m)
 }
 
 void
-Quantizer::fit(const std::vector<float> &traindata, int iter = 20, int seed = 123) 
+Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 123) 
 {
     assert(N_ == traindata.size() / D_);
     assert(K_ < N_ && "the number of training vector should be more than K_");
@@ -90,7 +90,7 @@ const std::vector<std::vector<std::vector<float>>>&
 Quantizer::get_centroids() {return centers_;}
 
 void 
-Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>> &centers_new)
+Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>>& centers_new)
 {
     assert(centers_new.size() == M_);
     centers_ = centers_new;
@@ -147,14 +147,14 @@ Quantizer::encode(const std::vector<float>& rawdata)
     return codes;
 }
 
-std::vector<float> Quantizer::nth_vector(const std::vector<float> &long_code, size_t n)
+std::vector<float> Quantizer::nth_vector(const std::vector<float>& long_code, size_t n)
 {
     return std::vector<float>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 // Each code: D = M_ * Ds_
 std::vector<float>
-Quantizer::nth_vector_mth_element(const std::vector<float> &long_code, size_t n, int m)
+Quantizer::nth_vector_mth_element(const std::vector<float>& long_code, size_t n, int m)
 {
     return std::vector<float>(long_code.begin() + n * D_ + m * Ds_, 
                             long_code.begin() + n * D_ + (m + 1) * Ds_);

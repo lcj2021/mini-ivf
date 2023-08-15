@@ -12,7 +12,7 @@
 namespace {
     // Linear search by L2 Distance computation. Return the best one (id, distance)
     std::pair<size_t, float> 
-    nearest_center(const std::vector<float> &query, const std::vector<std::vector<float>> &centers) 
+    nearest_center(const std::vector<float>& query, const std::vector<std::vector<float>>& centers) 
     {
         std::vector<float> dists(centers.size());
         size_t K_ = centers.size(), Ds_ = centers[0].size();
@@ -79,7 +79,9 @@ namespace {
                         ++count;
                     }
                 }
-                if (count > 0) {
+                // To match the centroids and the labels, 
+                // no update should be done in the last iter. 
+                if (iter_count != iter - 1 && count > 0) {
                     std::transform(sum.begin(), sum.end(), centroids[j].begin(), [count](float val) { return val / count; });
                 }
             }

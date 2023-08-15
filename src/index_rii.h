@@ -32,27 +32,27 @@ struct DistanceTable{
 
 class IndexRII {
 public:
-    IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords, 
+    IndexRII(const std::vector<std::vector<std::vector<float>>>& codewords, 
                         size_t D, size_t nlist, size_t M, size_t nbits, 
                         bool verbose, bool write_trainset);
 
     void Reconfigure(int nlist, int iter);
-    void AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_flag);
+    void AddCodes(const std::vector<std::vector<uint8_t>>& codes, bool update_flag);
     void train();
 
-    std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float> &query,
-                                                             const std::vector<int> &gt,
+    std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float>& query,
+                                                             const std::vector<int>& gt,
                                                              int topk,
                                                              int L,
                                                              int nprobe);
     void Clear();
 
     void UpdatePostingLists(size_t num);
-    DistanceTable DTable(const std::vector<float> &vec) const;
-    float ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code) const;
-    float ADist(const DistanceTable &dtable, size_t list_no, size_t offset) const;
-    float ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flattened_codes, size_t n) const;
-    std::pair<std::vector<size_t>, std::vector<float>> PairVectorToVectorPair(const std::vector<std::pair<size_t, float>> &pair_vec) const;
+    DistanceTable DTable(const std::vector<float>& vec) const;
+    float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
+    float ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const;
+    float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& flattened_codes, size_t n) const;
+    std::pair<std::vector<size_t>, std::vector<float>> PairVectorToVectorPair(const std::vector<std::pair<size_t, float>>& pair_vec) const;
 
     // Property getter
     size_t GetN() const {return flattened_codes_.size() / M_;}
@@ -60,11 +60,11 @@ public:
 
     std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<uint8_t> nth_vector(const std::vector<uint8_t> &long_code, size_t n) const;
+    std::vector<uint8_t> nth_vector(const std::vector<uint8_t>& long_code, size_t n) const;
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    uint8_t nth_vector_mth_element(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const;
+    uint8_t nth_vector_mth_element(const std::vector<uint8_t>& long_code, std::size_t n, size_t m) const;
     uint8_t nth_vector_mth_element(std::size_t list_no, size_t offset, size_t m) const;
-    std::vector<uint8_t>  encode(const std::vector<float> &vec) const;
+    std::vector<uint8_t>  encode(const std::vector<float>& vec) const;
     // Member variables
     size_t M_, Ks_, Ds_;
     bool verbose_, write_trainset_;
@@ -77,18 +77,21 @@ public:
 
     std::ofstream write_centroid_word;
     std::ofstream write_centroid_distribution;
+    std::ofstream write_centroid_farthest;
+    std::ofstream write_centroid_distance;
+    std::ofstream write_pq_codebook;
     std::ofstream write_l, write_r;
     std::ofstream write_queryword;
 };
 
 
-IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords, 
+IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>>& codewords, 
                         size_t D, size_t nlist, size_t M, size_t nbits, 
                         bool verbose=false, bool write_trainset=false)
 {
     verbose_ = verbose;
     write_trainset_ = write_trainset;
-    const auto &r = codewords;  // codewords must have ndim=3, with non-writable
+    const auto& r = codewords;  // codewords must have ndim=3, with non-writable
     M_ = (size_t) r.size();
     Ks_ = (size_t) r[0].size();
     Ds_ = (size_t) r[0][0].size();
@@ -108,9 +111,23 @@ IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>> &codewords
         std::string dataset_name = "sift1m_";
         write_centroid_word = std::ofstream(dataset_name + "centroid_word.csv");
         write_centroid_distribution = std::ofstream(dataset_name + "centroid_distribution.csv");
+        write_centroid_farthest = std::ofstream(dataset_name + "centroid_farthest.csv");
+        write_centroid_distance = std::ofstream(dataset_name + "centroid_distance.csv");
+        write_pq_codebook = std::ofstream(dataset_name + "pq_codebook.csv");
         write_l = std::ofstream(dataset_name + "l.csv");
         write_r = std::ofstream(dataset_name + "r.csv");
         write_queryword = std::ofstream(dataset_name + "queryword.csv");
+    }
+
+    if (write_trainset_) {
+        for (ssize_t m = 0; m < M_; ++m) {
+            for (ssize_t ks = 0; ks < Ks_; ++ks) {
+                for (ssize_t ds = 0; ds < Ds_; ++ds) {
+                    write_pq_codebook << codewords_[m][ks][ds] << ",";
+                }
+            }
+            write_pq_codebook << std::endl;
+        }
     }
 
     if (verbose_) {
@@ -139,7 +156,7 @@ IndexRII::Reconfigure(int nlist, int iter)
 
     std::vector<uint8_t> flattened_codes_randomly_picked;  // size=len_for_clustering
     flattened_codes_randomly_picked.reserve(len_for_clustering * M_);
-    for (const auto &id : ids_for_clustering) {  // Pick up vectors to construct a training set
+    for (const auto& id : ids_for_clustering) {  // Pick up vectors to construct a training set
         std::vector<uint8_t> code = nth_vector(flattened_codes_, id);
         flattened_codes_randomly_picked.insert(flattened_codes_randomly_picked.end(),
                                                code.begin(), code.end());
@@ -172,13 +189,13 @@ IndexRII::Reconfigure(int nlist, int iter)
     posting_dist_lists_.clear();
     posting_dist_lists_.resize(nlist);
 
-    for (auto &posting_list : posting_lists_) {
+    for (auto& posting_list : posting_lists_) {
         posting_list.reserve(GetN() / nlist);  // Roughly malloc
     }
-    for (auto &posting_dist_list : posting_dist_lists_) {
+    for (auto& posting_dist_list : posting_dist_lists_) {
         posting_dist_list.reserve(GetN() / nlist);  // Roughly malloc
     }
-    for (auto &code : codes_) {
+    for (auto& code : codes_) {
         code.reserve(GetN() / nlist);  // Roughly malloc
     }
     UpdatePostingLists(GetN());
@@ -189,7 +206,7 @@ IndexRII::Reconfigure(int nlist, int iter)
 }
 
 void 
-IndexRII::AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_flag)
+IndexRII::AddCodes(const std::vector<std::vector<uint8_t>>& codes, bool update_flag)
 {
     // (1) Add new input codes to flatted_codes. This imply pushes back the elements.
     // After that, if update_flg=true, (2) update posting lists for the input codes.
@@ -204,7 +221,7 @@ IndexRII::AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_f
     }
 
     // ===== (1) Add codes to flattened_codes =====
-    const auto &r = codes; // codes must have ndim=2; with non-writeable
+    const auto& r = codes; // codes must have ndim=2; with non-writeable
     size_t N = (size_t) r.size();
     std::cout << (size_t) r[0].size() << '\n';
     assert(M_ == (size_t) r[0].size());
@@ -228,8 +245,8 @@ IndexRII::AddCodes(const std::vector<std::vector<uint8_t>> &codes, bool update_f
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexRII::query(const std::vector<float> &query,
-                                            const std::vector<int> &gt,
+IndexRII::query(const std::vector<float>& query,
+                                            const std::vector<int>& gt,
                                             int topk,
                                             int L,
                                             int nprobe)
@@ -260,13 +277,13 @@ IndexRII::query(const std::vector<float> &query,
     // w = nlist;
     if (!write_trainset_) {
         std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
-                    [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
+        [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
     }
     // timer1.stop();
 
     std::unordered_set<int> gt_set;
     if (write_trainset_) {
-        const auto &gt_v = gt;
+        const auto& gt_v = gt;
         for (auto i = 0; i < gt_v.size(); ++i) {
             gt_set.insert(gt_v[i]);
         }
@@ -282,8 +299,7 @@ IndexRII::query(const std::vector<float> &query,
     std::vector<std::pair<size_t, float>> scores;
     scores.reserve(L);
     int coarse_cnt = 0;
-    // std::mutex mutex;
-    for (const auto &score_coarse : scores_coarse) {
+    for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
         coarse_cnt++;
         size_t bl = posting_lists_[no].size(), br = 0;
@@ -293,9 +309,9 @@ IndexRII::query(const std::vector<float> &query,
         // Doesn't benefit 
 // #pragma omp parallel for if(posting_lists_len > 10000)
         for (size_t idx = 0; idx < posting_lists_len; ++idx) {
-            // std::lock_guard<std::mutex> lock(mutex);
-            const auto &n = posting_lists_[no][idx];
+            const auto& n = posting_lists_[no][idx];
             if (write_trainset_ && gt_set.count(n)) {
+            // if (gt_set.count(n)) {
                 bl = std::min(bl, idx);
                 br = std::max(br, idx);
                 hit_count ++;
@@ -316,12 +332,13 @@ IndexRII::query(const std::vector<float> &query,
         if (write_trainset_) {
             write_l << std::fixed << std::setprecision(4) << (double)bl / posting_lists_[no].size() << ",";
             write_r << std::fixed << std::setprecision(4) << (double)br / posting_lists_[no].size() << ",";
+            write_centroid_distance << score_coarse.second << ",";
         }
 
         if ( (size_t) coarse_cnt == w && scores.size() >= (unsigned long) topk) {
             // ===== (8) Sort them =====
             std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
-                                [](const std::pair<size_t, float> &a, const std::pair<size_t, float> &b){return a.second < b.second;});
+                                [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
             scores.resize(topk);
             scores.shrink_to_fit();
             // for (auto [id, dist] : scores) {
@@ -332,6 +349,7 @@ IndexRII::query(const std::vector<float> &query,
             if (write_trainset_) {
                 write_l << std::endl;
                 write_r << std::endl;
+                write_centroid_distance << std::endl;
             }
             // timer2.stop();
             // std::cout << timer1.get_time() << ' ' << timer2.get_time() << " | " 
@@ -368,7 +386,7 @@ IndexRII::UpdatePostingLists(size_t num)
 
 #pragma omp parallel for
     for (size_t n = 0; n < num; ++n) {
-        const auto &nth_code = nth_vector(flattened_codes_, n);
+        const auto& nth_code = nth_vector(flattened_codes_, n);
         assign[n] = clustering_instance.predict_one(nth_code);
         #pragma omp critical
         {
@@ -381,18 +399,41 @@ IndexRII::UpdatePostingLists(size_t num)
     size_t nlist = GetNumList();
 #pragma omp parallel for
     for (size_t no = 0; no < nlist; ++no) {
-        auto &plist = posting_lists_[no];
-        const auto &center = coarse_centers_[no];
-        std::sort(plist.begin(), plist.end(), [&](const auto &a, const auto& b) {
-            return clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, a))
-                < clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, b));
-        });
-        auto &pdlist = posting_dist_lists_[no];
-// #pragma omp parallel for 
-// [Bug] No parallel here !
+        auto& plist = posting_lists_[no];
+        const auto& center = coarse_centers_[no];
+        auto& pdlist = posting_dist_lists_[no];
+        
+//         std::sort(plist.begin(), plist.end(), [&](const auto& a, const auto& b) {
+//             return clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, a))
+//                 < clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, b));
+//         });
+// // #pragma omp parallel for 
+// // [Bug] No parallel here !
+//         for (size_t i = 0; i < pdlist.size(); ++i) {
+//             pdlist[i] = clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, plist[i]));
+//         }
+
+        std::vector<size_t> indices(plist.size());
+        std::iota(indices.begin(), indices.end(), 0);
         for (size_t i = 0; i < pdlist.size(); ++i) {
             pdlist[i] = clustering_instance.SymmetricDistance(center, nth_vector(flattened_codes_, plist[i]));
         }
+
+        std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
+            return pdlist[a] < pdlist[b];
+        });
+        auto sorted_pdlist = pdlist;
+        auto sorted_plist = plist;
+        for (size_t i = 0; i < plist.size(); ++i) {
+            sorted_pdlist[i] = pdlist[indices[i]];
+            sorted_plist[i] = plist[indices[i]];
+        }
+        std::swap(pdlist, sorted_pdlist);
+        std::swap(plist, sorted_plist);
+        std::vector<float>().swap(sorted_pdlist);
+        std::vector<int>().swap(sorted_plist);
+        // assert(std::is_sorted(pdlist.begin(), pdlist.end()));
+
         for (const auto& id : plist) {
             const auto& nth_code = nth_vector(flattened_codes_, id);
             codes_[no].insert(codes_[no].end(), nth_code.begin(), nth_code.end());
@@ -400,17 +441,40 @@ IndexRII::UpdatePostingLists(size_t num)
     }
 
     if (write_trainset_) {
-        auto &write_d = write_centroid_distribution;
-        auto &write_w = write_centroid_word;
+        auto& write_d = write_centroid_distribution;
+        auto& write_w = write_centroid_word;
+        auto& write_f = write_centroid_farthest;
         for (int no = 0; no < nlist; ++no) {
             const auto& centroidword = coarse_centers_[no];
             for (const auto& word : centroidword) write_w << (int)word << ",";
             const auto& pdlist = posting_dist_lists_[no];
-            size_t step = pdlist.size() / 20;
-            for (size_t i = 0; i < 20; ++i) {
-                size_t idx = i * step;
-                write_d << pdlist[idx] << ",";
+
+            std::vector<float> dist_bin(21);
+            std::vector<size_t> count_bin(20);
+            float interval = pdlist.back() / 20;
+            for (size_t i = 0; i < 21; ++ i) {
+                dist_bin[i] = i * interval;
             }
+            size_t idx = 1;
+            for (const auto& dist : pdlist) {
+                if (dist > dist_bin[idx]) {
+                    idx ++;
+                } else {
+                }
+                count_bin[idx - 1] ++;
+            }
+            for (const auto& count : count_bin) {
+                write_d << count << ",";
+            }
+
+            write_f << pdlist.back() << std::endl;
+
+            // size_t step = pdlist.size() / 20;
+            // for (size_t i = 0; i < 20; ++i) {
+            //     size_t idx = i * step;
+            //     write_d << pdlist[idx] << ",";
+            // }
+
             write_d << std::endl;
             write_w << std::endl;
         }
@@ -418,9 +482,9 @@ IndexRII::UpdatePostingLists(size_t num)
 }
 
 DistanceTable 
-IndexRII::DTable(const std::vector<float> &vec) const
+IndexRII::DTable(const std::vector<float>& vec) const
 {
-    const auto &v = vec;
+    const auto& v = vec;
     size_t Ds = codewords_[0][0].size();
     assert((size_t) v.size() == M_ * Ds);
     DistanceTable dtable(M_, Ks_);
@@ -433,7 +497,7 @@ IndexRII::DTable(const std::vector<float> &vec) const
 }
 
 float 
-IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code) const
+IndexRII::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const
 {
     assert(code.size() == M_);
     float dist = 0;
@@ -445,7 +509,7 @@ IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &code) c
 }
 
 float 
-IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flattened_codes, size_t n) const
+IndexRII::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& flattened_codes, size_t n) const
 {
     float dist = 0;
     for (size_t m = 0; m < M_; ++m) {
@@ -456,7 +520,7 @@ IndexRII::ADist(const DistanceTable &dtable, const std::vector<uint8_t> &flatten
 }
 
 float 
-IndexRII::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) const
+IndexRII::ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const
 {
     float dist = 0;
     for (size_t m = 0; m < M_; ++m) {
@@ -467,7 +531,7 @@ IndexRII::ADist(const DistanceTable &dtable, size_t list_no, size_t offset) cons
 }
 
 std::vector<uint8_t> 
-IndexRII::encode(const std::vector<float> &vec) const
+IndexRII::encode(const std::vector<float>& vec) const
 {
     std::vector<uint8_t> code(M_);
     for (std::size_t m = 0; m < M_; ++m) {
@@ -486,7 +550,7 @@ IndexRII::encode(const std::vector<float> &vec) const
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexRII::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> > &pair_vec) const
+IndexRII::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> >& pair_vec) const
 {
     std::pair<std::vector<size_t>, std::vector<float>> vec_pair(std::vector<size_t>(pair_vec.size()), std::vector<float>(pair_vec.size()));
     for(size_t n = 0, N = pair_vec.size(); n < N; ++n) {
@@ -504,13 +568,13 @@ IndexRII::get_single_code(size_t list_no, size_t offset) const
 }
 
 std::vector<uint8_t> 
-IndexRII::nth_vector(const std::vector<uint8_t> &long_code, size_t n) const
+IndexRII::nth_vector(const std::vector<uint8_t>& long_code, size_t n) const
 {
     return std::vector<uint8_t>(long_code.begin() + n * M_, long_code.begin() + (n + 1) * M_);
 }
 
 uint8_t 
-IndexRII::nth_vector_mth_element(const std::vector<uint8_t> &long_code, std::size_t n, size_t m) const
+IndexRII::nth_vector_mth_element(const std::vector<uint8_t>& long_code, std::size_t n, size_t m) const
 {
     return long_code[ n * M_ + m];
 }

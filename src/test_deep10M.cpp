@@ -23,7 +23,7 @@ int main() {
     load_from_file(gt, "../../dataset/deep-image-96-angular.hdf5", "neighbors");
 
     // ProductQuantizer PQ(D, 32, 8);
-    // auto & codewords = PQ.fit(database, 1);
+    // auto& codewords = PQ.fit(database, 1);
     Quantizer::Quantizer CQ(D, nb, 32, 1LL << 8, 10, true);
     CQ.fit(database, 10, 123);
     const auto& codewords_cq = CQ.get_centroids();
