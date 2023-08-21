@@ -4,7 +4,7 @@
 #include <iostream>
 #include <numeric>
 
-#include "index_ivfpq.h"
+#include "index_ivf.h"
 #include "quantizer.h"
 #include "util.h"
 
@@ -16,13 +16,13 @@ size_t nt = 15'000;         // make a set of nt training vectors in the unit cub
 // size_t nt = 1'000;         // make a set of nt training vectors in the unit cube (could be the database)
 int nq = 2'000;               // size of the queries we plan to search
 int ncentroids = 25;
-int nprobe = 10;
+int nprobe = 25;
 size_t mp = 32;
 
-Toy::IVFPQConfig cfg(nb, D, nprobe, nb / 50, 
-                    ncentroids, 256, 
-                    1, mp, 
-                    D, D / mp);
+Toy::IVFConfig cfg(nb, D, nprobe, nb / 50, 
+                    ncentroids, 
+                    1,
+                    D);
 
 int main() {
     std::mt19937 rng;
@@ -47,7 +47,7 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVFPQ index(cfg, true, false);
+    Toy::IndexIVF index(cfg, true, false);
     index.train(database_flat, 123, false);
     index.populate(database_flat);
     // index.Reconfigure(ncentroids, 5);

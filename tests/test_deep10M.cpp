@@ -14,17 +14,17 @@ int main() {
     // size of the queries we plan to search
 
     std::vector<float> database;
-    auto [nb, D] = load_from_file(database, "../../dataset/deep-image-96-angular.hdf5", "train");
+    auto [nb, D] = load_from_file_hdf5(database, "../../dataset/deep-image-96-angular.hdf5", "train");
 
     std::vector<float> query;
-    auto [nq, _] = load_from_file(query, "../../dataset/deep-image-96-angular.hdf5", "test");
+    auto [nq, _] = load_from_file_hdf5(query, "../../dataset/deep-image-96-angular.hdf5", "test");
 
     std::vector<int> gt;
-    load_from_file(gt, "../../dataset/deep-image-96-angular.hdf5", "neighbors");
+    load_from_file_hdf5(gt, "../../dataset/deep-image-96-angular.hdf5", "neighbors");
 
     // ProductQuantizer PQ(D, 32, 8);
     // auto& codewords = PQ.fit(database, 1);
-    Quantizer::Quantizer CQ(D, nb, 32, 1LL << 8, 10, true);
+    Quantizer::Quantizer CQ(D, nb, 32, 1LL << 8, true);
     CQ.fit(database, 10, 123);
     const auto& codewords_cq = CQ.get_centroids();
 
@@ -32,7 +32,7 @@ int main() {
     int ncentroids = 25;
     // nprobe
     int nprobe = 10;
-    Toy::indexRII index(codewords_cq, D, ncentroids, 32, 8, true);
+    Toy::IndexRII index(codewords_cq, D, ncentroids, 32, 8, true);
     index.AddCodes(CQ.encode(database), false);
     index.Reconfigure(ncentroids, 5);
 

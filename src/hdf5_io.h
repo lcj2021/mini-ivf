@@ -1,4 +1,5 @@
-#pragma once
+#ifndef HDF5_IO_H
+#define HDF5_IO_H
 
 #include <iostream>
 #include <vector>
@@ -35,33 +36,54 @@ template<>
 hid_t get_hdf5_type<long double>() { return H5T_NATIVE_LDOUBLE; }
 
 
+template <typename T>
+H5::DataType get_hdf5_datatype() {
+    if (std::is_same<T, int>::value)                return H5::PredType::NATIVE_INT;
+    else if (std::is_same<T, unsigned char>::value) return H5::PredType::NATIVE_UCHAR;
+    else if (std::is_same<T, float>::value)         return H5::PredType::NATIVE_FLOAT;
+    else if (std::is_same<T, double>::value)        return H5::PredType::NATIVE_DOUBLE;
+    else {
+        throw std::runtime_error("Unsupported type for HDF5");
+    }
+}
+
+// C++ API style
+template<typename T>
+void write_to_file_hdf5(const std::vector<T>& data, std::pair<size_t, size_t> dimension, const std::string &filename, const std::string &dataset_name) {
+    try {
+        H5::H5File file(filename, H5F_ACC_TRUNC);
+        hsize_t dims[2] = {dimension.first, dimension.second};
+        H5::DataSpace dataspace(2, dims);
+        H5::DataSet dataset = file.createDataSet(dataset_name, get_hdf5_datatype<T>(), dataspace);
+        dataset.write(&data[0], get_hdf5_datatype<T>());
+        printf("%s[%s]: [%llu x %llu] has written!\n", filename.data(), dataset_name.data(), dims[0], dims[1]);
+    } catch (const H5::Exception& e) {
+        std::cerr << "Exception caught: " << e.getDetailMsg() << std::endl;
+        throw;
+    }
+}
+
 // return the dimention of corresponding dataset
 template<typename T>
-std::pair<size_t, size_t> load_from_file(std::vector<T>& data, const std::string &filename, const std::string &dataset_name) {
-    hid_t file_id = H5Fopen(filename.data(), H5F_ACC_RDWR, H5P_DEFAULT);
-    assert(file_id >= 0 && "Error opening hdf5 file.");
+std::pair<size_t, size_t> load_from_file_hdf5(std::vector<T>& data, const std::string &filename, const std::string &dataset_name) {
+    try {
+        H5::H5File file(filename, H5F_ACC_RDONLY);
+        H5::DataSet dataset = file.openDataSet(dataset_name);
+        H5::DataSpace dataspace = dataset.getSpace();
 
-    hid_t dataset_id;
-#if H5Dopen_vers == 2
-    dataset_id = H5Dopen2(file_id, dataset_name.data(), H5P_DEFAULT);
-#else
-    dataset_id = H5Dopen(file_id, dataset_name.data());
-#endif
-    assert(dataset_id >= 0 && "Error opening dataset in file.");
+        hsize_t dims_out[2];
+        dataspace.getSimpleExtentDims(dims_out, NULL);
 
-    hid_t space_id = H5Dget_space(dataset_id);
+        data.resize(dims_out[0] * dims_out[1]);
+        printf("%s[%s]: [%llu x %llu] has loaded!\n", filename.data(), dataset_name.data(), dims_out[0], dims_out[1]);
 
-    hsize_t dims_out[2];
-    H5Sget_simple_extent_dims(space_id, dims_out, NULL);
+        dataset.read(&data[0], get_hdf5_datatype<T>());
 
-    data.resize(dims_out[0] * dims_out[1]);
-    printf("%s[%s]: [%llu x %llu]\n", filename.data(), dataset_name.data(), dims_out[0], dims_out[1]);
-
-    herr_t status = H5Dread(dataset_id, get_hdf5_type<T>(), H5S_ALL, H5S_ALL, H5P_DEFAULT, &data[0]);
-    assert(status >= 0 && "Error reading data");
-
-    H5Sclose(space_id);
-    H5Dclose(dataset_id);
-    // H5Fclose(file_id);
-    return {dims_out[0], dims_out[1]};
+        return {dims_out[0], dims_out[1]};
+    } catch (const H5::Exception& e) {
+        std::cerr << "Exception caught: " << e.getDetailMsg() << std::endl;
+        throw;
+    }
 }
+
+#endif

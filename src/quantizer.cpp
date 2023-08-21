@@ -130,7 +130,7 @@ Quantizer::encode(const std::vector<float>& rawdata)
     std::vector<std::vector<uint8_t>> codes(N, std::vector<uint8_t>(M_, 0));
 
     for (size_t m = 0; m < M_; ++m) {
-        if (verbose_) {
+        if (N > 1 && verbose_) {
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
         std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));

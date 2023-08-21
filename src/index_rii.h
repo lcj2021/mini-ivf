@@ -6,9 +6,9 @@
 #include <cassert>
 #include <unordered_set>
 #include <fstream>
-#include <mutex>
 #include "pqkmeans.h"
 #include "util.h"
+#include "distance.h"
 #include "quantizer.h"
 
 namespace Toy {
@@ -34,7 +34,7 @@ class IndexRII {
 public:
     IndexRII(const std::vector<std::vector<std::vector<float>>>& codewords, 
                         size_t D, size_t nlist, size_t M, size_t nbits, 
-                        bool verbose, bool write_trainset);
+                        bool verbose, bool write_trainset, bool use_pred_lr);
 
     void Reconfigure(int nlist, int iter);
     void AddCodes(const std::vector<std::vector<uint8_t>>& codes, bool update_flag);
@@ -44,7 +44,8 @@ public:
                                                              const std::vector<int>& gt,
                                                              int topk,
                                                              int L,
-                                                             int nprobe);
+                                                             int nprobe, 
+                                                             int id);
     void Clear();
 
     void UpdatePostingLists(size_t num);
@@ -67,13 +68,14 @@ public:
     std::vector<uint8_t>  encode(const std::vector<float>& vec) const;
     // Member variables
     size_t M_, Ks_, Ds_;
-    bool verbose_, write_trainset_;
+    bool verbose_, write_trainset_, use_pred_lr_;
     std::vector<std::vector<std::vector<float>>> codewords_;  // (M, Ks, Ds)
     std::vector<std::vector<uint8_t>> coarse_centers_;  // (NumList, M)
     std::vector<uint8_t> flattened_codes_;  // (N, M) PQ codes are flattened to N * M long array
     std::vector<std::vector<uint8_t>> codes_; // binary codes, size nlist
     std::vector<std::vector<int>> posting_lists_;  // (NumList, any)
     std::vector<std::vector<float>> posting_dist_lists_;  // (NumList, any)
+    std::vector<std::vector<float>> pred_lr;  
 
     std::ofstream write_centroid_word;
     std::ofstream write_centroid_distribution;
@@ -87,10 +89,11 @@ public:
 
 IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>>& codewords, 
                         size_t D, size_t nlist, size_t M, size_t nbits, 
-                        bool verbose=false, bool write_trainset=false)
+                        bool verbose=false, bool write_trainset=false, bool use_pred_lr=false)
 {
     verbose_ = verbose;
     write_trainset_ = write_trainset;
+    use_pred_lr_ = use_pred_lr;
     const auto& r = codewords;  // codewords must have ndim=3, with non-writable
     M_ = (size_t) r.size();
     Ks_ = (size_t) r[0].size();
@@ -129,6 +132,15 @@ IndexRII::IndexRII(const std::vector<std::vector<std::vector<float>>>& codewords
             write_pq_codebook << std::endl;
         }
     }
+
+    pred_lr.resize(10'000, std::vector<float>(12));
+    std::ifstream read_lr("pred_lr.txt");
+    for (size_t q = 9000; q < 9128; ++q) {
+        for (size_t j = 0; j < 12; ++j) {
+            read_lr >> pred_lr[q][j];
+        }
+    }
+    for (const auto& x : pred_lr[9000]) std::cout << x << ' ';  puts("");
 
     if (verbose_) {
         // Check which SIMD functions are used. See distance.h for this global variable.
@@ -249,7 +261,8 @@ IndexRII::query(const std::vector<float>& query,
                                             const std::vector<int>& gt,
                                             int topk,
                                             int L,
-                                            int nprobe)
+                                            int nprobe,
+                                            int id)
 {
     assert((size_t) topk <= GetN());
     assert(topk <= L && (size_t) L <= GetN());
@@ -276,7 +289,9 @@ IndexRII::query(const std::vector<float>& query,
     w = nprobe;
     // w = nlist;
     if (!write_trainset_) {
-        std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
+        // std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + w, scores_coarse.end(),
+        // [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+        std::sort(scores_coarse.begin(), scores_coarse.end(),
         [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
     }
     // timer1.stop();
@@ -301,14 +316,29 @@ IndexRII::query(const std::vector<float>& query,
     int coarse_cnt = 0;
     for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
-        coarse_cnt++;
         size_t bl = posting_lists_[no].size(), br = 0;
         size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
 
         // [TODO] parallelized
         // Doesn't benefit 
 // #pragma omp parallel for if(posting_lists_len > 10000)
-        for (size_t idx = 0; idx < posting_lists_len; ++idx) {
+        size_t pred_l_idx = 0, pred_r_idx = posting_lists_len; 
+
+        if (use_pred_lr_) {
+            double pred_l = pred_lr[id][coarse_cnt] - 0.5, pred_r = pred_lr[id][coarse_cnt + 6] + 0.5;
+            // double pred_l = pred_lr[id][coarse_cnt], pred_r = pred_lr[id][coarse_cnt + 6];
+            pred_l = std::max(0.0, pred_l);
+            pred_l = std::min(1.00, pred_l);
+            pred_r = std::max(0.0, pred_r);
+            pred_r = std::min(1.00, pred_r);
+            pred_l_idx = pred_l * posting_lists_len;
+            pred_r_idx = pred_r * posting_lists_len;
+            if (pred_l_idx >= pred_r_idx) {
+                // pred_l_idx = 0;
+                // pred_r_idx = posting_lists_len;
+            }
+        }
+        for (size_t idx = pred_l_idx; idx < pred_r_idx; ++idx) {
             const auto& n = posting_lists_[no][idx];
             if (write_trainset_ && gt_set.count(n)) {
             // if (gt_set.count(n)) {
@@ -325,6 +355,7 @@ IndexRII::query(const std::vector<float>& query,
             scores.emplace_back(n, ADist(dtable, no, idx));
         }
 
+        coarse_cnt++;
         // std::cout << std::fixed << std::setprecision(2)
         //             << (double)bl / posting_lists_[no].size() << ' ' 
         //             << (double)br / posting_lists_[no].size() << "\t"
@@ -335,8 +366,10 @@ IndexRII::query(const std::vector<float>& query,
             write_centroid_distance << score_coarse.second << ",";
         }
 
-        if ( (size_t) coarse_cnt == w && scores.size() >= (unsigned long) topk) {
+        // if ( (size_t) coarse_cnt == w && scores.size() >= (unsigned long) topk) {
+        if ( (size_t) coarse_cnt == w) {
             // ===== (8) Sort them =====
+            topk = std::min(topk, (int)scores.size());
             std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
                                 [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
             scores.resize(topk);

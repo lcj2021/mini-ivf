@@ -83,7 +83,7 @@ static inline __m256 masked_read_8 (int d, const float *x)
 
 
 
- #if defined(__AVX512F__) 
+#if defined(__AVX512F__) 
 // Reading function for AVX512
 // reads 0 <= d < 16 floats as __m512
 static inline __m512 masked_read_16 (int d, const float *x)

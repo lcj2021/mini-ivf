@@ -4,16 +4,15 @@
 #include <unordered_set>
 
 #include "hdf5_io.h"
-#include "index_ivfpq.h"
+#include "index_ivf.h"
 #include "quantizer.h"
 #include "util.h"
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 64;
-int ncentroids = 100;
-int nprobe = 6;
+int ncentroids = 1;
+int nprobe = ncentroids;
 
 int main() {
     // dimension of the vectors to index
@@ -22,38 +21,29 @@ int main() {
     // size of the queries we plan to search
 
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file(database, "../../dataset/sift-128-euclidean.hdf5", "train");
+    std::tie(nb, D) = load_from_file_hdf5(database, "../../dataset/sift-128-euclidean.hdf5", "train");
 
     std::vector<float> query;
-    auto [nq, _] = load_from_file(query, "../../dataset/sift-128-euclidean.hdf5", "test");
+    auto [nq, _] = load_from_file_hdf5(query, "../../dataset/sift-128-euclidean.hdf5", "test");
 
     std::vector<int> gt;
-    load_from_file(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
+    load_from_file_hdf5(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
 
-    Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
-                    ncentroids, 256, 
-                    1, mp, 
-                    D, D / mp);
-    Toy::IndexIVFPQ index(cfg, true, false);
+    // std::vector<float> gt_d;
+    // load_from_file_hdf5(gt_d, "../../dataset/sift-128-euclidean.hdf5", "distances");
+
+    Toy::IVFConfig cfg(nb, D, nprobe, nb, 
+                    ncentroids,
+                    1,
+                    D);
+    Toy::IndexIVF index(cfg, true, false);
     index.train(database, 123, true);
     index.populate(database);
-
-    // Quantizer::Quantizer CQ(D, nb, M, 1LL << nbits, 5, true);
-    // CQ.fit(database, 5, 123);
-    // const auto& codewords_cq = CQ.get_centroids();
-
-    // // a reasonable number of centroids to index nb vectors
-    // int ncentroids = 100;
-    // // nprobe
-    // int nprobe = 100;
-    // // Toy::IndexRII index(codewords, D, ncentroids, M, nbits, true, false);
-    // // index.AddCodes(PQ.encode(database), false);
-    // Toy::IndexRII index(codewords_cq, D, ncentroids, M, nbits, true, true);
 
     puts("Index find kNN!");
     // Recall@k
     int k = 100;
-    nq = 1'000;
+    nq = 10'000;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;

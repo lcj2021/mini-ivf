@@ -7,9 +7,9 @@
 #include <cassert>
 #include <unordered_set>
 #include <fstream>
+#include "pqkmeans.h"
 #include "util.h"
 #include "quantizer.h"
-#include "binary_io.h"
 #include "distance.h"
 #include <omp.h>
 
@@ -21,40 +21,40 @@ namespace Toy {
  * @param D_ the number of dimensions
  * @param W_ the number of bucket involed when searching is performed
  * @param L_ the expected number of candidates involed when searching is performed
- * @param kc, kp the number of coarse quantizer (nlist) and product quantizer's centers (1 << nbits). Default: 100, 256
- * @param mc, mp the number of subspace for coarse quantizer and product quantizer. mc must be 1
- * @param dc, dp the dimensions of subspace for coarse quantize and product quantizer. dc must be D_.  dp = D_ / mp
+ * @param kc the number of coarse quantizer's (nlist) centers. Default: 100
+ * @param mc the number of subspace for coarse quantizer. mc must be 1
+ * @param dc the dimensions of subspace for coarse quantize and product quantizer. dc must be D_.  dp = D_ / mp
  * @param db_path path to the DB files
  * @param db_prefix the prefix of DB files
  */
-struct IVFPQConfig {
-	size_t N_, D_, W_, L_, kc, kp, mc, mp, dc, dp;
+struct IVFConfig {
+	size_t N_, D_, W_, L_, kc, mc, dc;
 	// std::string db_prefix;
 	// std::string db_path;
-    IVFPQConfig(size_t N, size_t D, size_t W, size_t L, 
-                size_t kc, size_t kp, 
-                size_t mc, size_t mp, 
-                size_t dc, size_t dp) : N_(N), D_(D), W_(W), L_(L), 
-                kc(kc), kp(kp), mc(mc), mp(mp), dc(dc), dp(dp) {}
+    IVFConfig(size_t N, size_t D, size_t W, size_t L, 
+                size_t kc, 
+                size_t mc, 
+                size_t dc) : N_(N), D_(D), W_(W), L_(L), 
+                kc(kc), mc(mc), dc(dc) {}
 };
 
 struct DistanceTable{
     // Helper structure. This is identical to vec<vec<float>> dt(M, vec<float>(Ks))
     DistanceTable() {}
     DistanceTable(size_t M, size_t Ks) : kp(Ks), data_(M * Ks) {}
-    void set_value(size_t m, size_t ks, float val) {
+    void SetVal(size_t m, size_t ks, float val) {
         data_[m * kp + ks] = val;
     }
-    float get_value(size_t m, size_t ks) const {
+    float GetVal(size_t m, size_t ks) const {
         return data_[m * kp + ks];
     }
     size_t kp;
     std::vector<float> data_;
 };
 
-class IndexIVFPQ {
+class IndexIVF {
 public:
-    IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool write_trainset);
+    IndexIVF(const IVFConfig& cfg, bool verbose, bool write_trainset);
 
     void populate(const std::vector<float>& rawdata);
     void train(const std::vector<float>& traindata, int seed, bool need_split);
@@ -62,67 +62,66 @@ public:
     std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float>& query,
                                                              const std::vector<int>& gt,
                                                              int topk,
-                                                             int L,
-                                                             int id);
-    void insert_ivf(const std::vector<float>& rawdata);
-    void write_trainset(const std::string& dataset_name);
+                                                             int L);
+    void Clear();
 
-    DistanceTable DTable(const std::vector<float>& vec) const;
+    void insert_ivf(const std::vector<float>& rawdata);
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
     float ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const;
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& flattened_codes, size_t n) const;
     std::pair<std::vector<size_t>, std::vector<float>> PairVectorToVectorPair(const std::vector<std::pair<size_t, float>>& pair_vec) const;
 
-    std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
+    // Property getter
+    size_t GetN() const {return flattened_codes_.size() / mp;}
+    size_t GetNumList() const {return centers_cq_.size();}
+
+    const std::vector<float> get_single_code(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
     template<typename T>
     const std::vector<T> nth_raw_vector(const std::vector<T>& long_code, size_t n) const;
     // Given a long (N * M) codes, pick up m-th element from n-th code
     uint8_t nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, size_t m) const;
     uint8_t nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const;
+    std::vector<uint8_t>  encode(const std::vector<float>& vec) const;
     // Member variables
-    size_t N_, D_, W_, L_, nq, kc, kp, mc, mp, dc, dp;
+    size_t N_, D_, W_, L_, kc, kp, mc, mp, dc, dp;
     bool verbose_, write_trainset_, is_trained_;
 
-    std::unique_ptr<Quantizer::Quantizer> cq_, pq_;
+    std::unique_ptr<Quantizer::Quantizer> cq_;
 
     std::vector<std::vector<float>> centers_cq_;
     std::vector<int> labels_cq_;
 
-    std::vector<std::vector<std::vector<float>>> centers_pq_;
-    std::vector<std::vector<int>> labels_pq_;
-
-
-    std::vector<std::vector<uint8_t>> db_codes_; // binary codes, size nlist
+    std::vector<std::vector<uint8_t>> coarse_centers_;  // (kc, mc) => (kc, D_)
+    std::vector<uint8_t> flattened_codes_;  // (N, M) PQ codes are flattened to N * M long array
+    std::vector<std::vector<float>> codes_; // binary codes, size nlist
     std::vector<std::vector<int>> posting_lists_;  // (NumList, any)
     std::vector<std::vector<float>> posting_dist_lists_;  // (NumList, any)
 
-    std::vector<float> L, R, distance_, farthest_;
-    std::vector<int> querycodes_, centroidcodes_, distribution_;
+    std::ofstream write_centroid_word;
+    std::ofstream write_centroid_distribution;
+    std::ofstream write_l, write_r;
+    std::ofstream write_queryword;
 };
 
 
-IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool write_trainset)
-    : N_(cfg.N_), D_(cfg.D_), W_(cfg.W_), L_(cfg.L_), nq(nq), 
-    kc(cfg.kc), kp(cfg.kp), mc(cfg.mc), mp(cfg.mp), dc(cfg.dc), dp(cfg.dp)
+IndexIVF::IndexIVF(const IVFConfig& cfg, bool verbose, bool write_trainset)
+    : N_(cfg.N_), D_(cfg.D_), W_(cfg.W_), L_(cfg.L_), 
+    kc(cfg.kc), mc(cfg.mc), dc(cfg.dc)
 {
     verbose_ = verbose;
     write_trainset_ = write_trainset;
     assert(dc == D_ && mc == 1);
 
     cq_ = nullptr;
-    pq_ = nullptr;
 
     if (write_trainset) {
-        L.resize(nq * W_);
-        R.resize(nq * W_);
-        distance_.resize(nq * W_);
-
-        farthest_.resize(kc);
-        distribution_.resize(kc * 20);
-
-        querycodes_.resize(nq * mp);
-        centroidcodes_.resize(kc * mp);
+        std::string dataset_name = "sift1m_";
+        write_centroid_word = std::ofstream(dataset_name + "centroid_word.csv");
+        write_centroid_distribution = std::ofstream(dataset_name + "centroid_distribution.csv");
+        write_l = std::ofstream(dataset_name + "l.csv");
+        write_r = std::ofstream(dataset_name + "r.csv");
+        write_queryword = std::ofstream(dataset_name + "queryword.csv");
     }
 
     if (verbose_) {
@@ -132,7 +131,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool wri
 }
 
 void 
-IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, bool need_split)
+IndexIVF::train(const std::vector<float>& rawdata, int seed, bool need_split)
 {
     std::vector<float>* traindata = nullptr;
     size_t Nt_ = rawdata.size() / D_;
@@ -154,7 +153,7 @@ IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, bool need_split)
     }
 
     cq_ = std::make_unique<Quantizer::Quantizer>(D_, Nt_, mc, kc, true);
-    cq_->fit(*traindata, 12, seed);
+    cq_->fit(*traindata, 10, seed);
     centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
     labels_cq_ = cq_->get_assignments()[0];
 
@@ -167,24 +166,27 @@ IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, bool need_split)
     //     std::cout << cnt << '\n';
     // }
 
-    pq_ = std::make_unique<Quantizer::Quantizer>(D_, Nt_, mp, kp, true);
-    pq_->fit(*traindata, 6, seed);
-    centers_pq_ = pq_->get_centroids();
-    labels_pq_ = pq_->get_assignments();
-
     if (traindata != &rawdata) delete traindata;
     is_trained_ = true;
 }
 
 void 
-IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
+IndexIVF::insert_ivf(const std::vector<float>& rawdata)
 {
-    const auto& pqcodes = pq_->encode(rawdata);
+    // ===== (2) Update posting lists =====
+    // std::vector<size_t> assign(num);
+    // puts("########################");
+    // std::cout << num << ' ' << *std::max_element(labels_cq_.begin(), labels_cq_.end()) << '\n';
+    // std::cout << labels_cq_.size() << '\n';
+    // std::cout << posting_lists_.size() << '\n';
+    // std::cout << posting_dist_lists_.size() << '\n';
+    // std::cout << nth_raw_vector(rawdata, 0).size() << '\n';
+    // assert(nth_raw_vector(rawdata, 0).size() == D_);
 
 // #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
         int id = cq_->predict_one(nth_raw_vector(rawdata, n), 0);
-        // #pragma omp critical
+        #pragma omp critical
         {
             posting_lists_[id].emplace_back(n);
             posting_dist_lists_[id].emplace_back(0);
@@ -223,46 +225,15 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
         std::vector<int>().swap(sorted_plist);
 
         for (const auto& id : plist) {
-            const auto& nth_code = pqcodes[id];
-            db_codes_[no].insert(db_codes_[no].end(), nth_code.begin(), nth_code.end());
-        }
-    }
-
-    if (write_trainset_) {
-        for (int no = 0; no < kc; ++no) {
-            const auto& centroidword = pq_->encode(centers_cq_[no]);
-            // printf("!!!!!!!!!!!!!!!!!!!%d\n", no);
-            // for (auto x : centroidword[0]) std::cout << (int)x << ' '; std::cout << '\n';
-            for (size_t i = 0; i < centroidword[0].size(); ++i) {
-                centroidcodes_[no * mp + i] = (int)centroidword[0][i];
-            }
-            const auto& pdlist = posting_dist_lists_[no];
-
-            std::vector<float> dist_bin(21);
-            std::vector<size_t> count_bin(20);
-            float interval = pdlist.back() / 20;
-            for (size_t i = 0; i < 21; ++ i) {
-                dist_bin[i] = i * interval;
-            }
-            size_t idx = 1;
-            for (const auto& dist : pdlist) {
-                if (dist > dist_bin[idx]) {
-                    idx ++;
-                } else {
-                }
-                count_bin[idx - 1] ++;
-            }
-            for (size_t i = 0; i < 20; ++i) {
-                distribution_[no * 20 + i] = count_bin[i];
-            }
-            farthest_[no] = pdlist.back();
+            const auto& nth_code = nth_raw_vector(rawdata, id);
+            codes_[no].insert(codes_[no].end(), nth_code.begin(), nth_code.end());
         }
     }
 }
 
 
 void 
-IndexIVFPQ::populate(const std::vector<float>& rawdata)
+IndexIVF::populate(const std::vector<float>& rawdata)
 {
     assert(rawdata.size() / D_ == N_);
     if (!is_trained_ || centers_cq_.empty()) {
@@ -282,8 +253,8 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
 
     posting_lists_.clear();
     posting_lists_.resize(kc);
-    db_codes_.clear();
-    db_codes_.resize(kc);
+    codes_.clear();
+    codes_.resize(kc);
     posting_dist_lists_.clear();
     posting_dist_lists_.resize(kc);
 
@@ -293,7 +264,7 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
     for (auto& posting_dist_list : posting_dist_lists_) {
         posting_dist_list.reserve(N_ / kc);  // Roughly malloc
     }
-    for (auto& code : db_codes_) {
+    for (auto& code : codes_) {
         code.reserve(N_ / kc);  // Roughly malloc
     }
     insert_ivf(rawdata);
@@ -304,16 +275,11 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::query(const std::vector<float>& query,
+IndexIVF::query(const std::vector<float>& query,
                                             const std::vector<int>& gt,
                                             int topk,
-                                            int L,
-                                            int id)
+                                            int L)
 {
-    // ===== (1) Create dtable =====
-    DistanceTable dtable = DTable(query);
-
-
     // ===== (2) Compare to coarse centers and sort the results =====
     std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
 //#pragma omp parallel for
@@ -330,12 +296,14 @@ IndexIVFPQ::query(const std::vector<float>& query,
 
     std::unordered_set<int> gt_set;
     if (write_trainset_) {
-        gt_set = std::unordered_set<int>(gt.begin(), gt.end());
-        const auto& queryword = pq_->encode(query);
-        assert(queryword[0].size() == mp);
-        for (size_t i = 0; i < queryword[0].size(); ++i) {
-            querycodes_[id * mp + i] = (int)queryword[0][i];
+        const auto& gt_v = gt;
+        for (auto i = 0; i < gt_v.size(); ++i) {
+            gt_set.insert(gt_v[i]);
         }
+        for (const auto& word : query) {
+            write_queryword << (int)word << ",";
+        }
+        write_queryword << std::endl;
     }
 
     // ===== (4) Traverse posting list =====
@@ -345,6 +313,7 @@ IndexIVFPQ::query(const std::vector<float>& query,
     int coarse_cnt = 0;
     for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
+        coarse_cnt++;
         size_t bl = posting_lists_[no].size(), br = 0;
         size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
 
@@ -353,36 +322,39 @@ IndexIVFPQ::query(const std::vector<float>& query,
 // #pragma omp parallel for if(posting_lists_len > 10000)
         for (size_t idx = 0; idx < posting_lists_len; ++idx) {
             const auto& n = posting_lists_[no][idx];
-            if (write_trainset_ && gt_set.count(n)) {
-                bl = std::min(bl, idx);
-                br = std::max(br, idx);
-                hit_count ++;
-            }
+            // if (write_trainset_ && gt_set.count(n)) {
+            //     bl = std::min(bl, idx);
+            //     br = std::max(br, idx);
+            //     hit_count ++;
+            // }
             // ===== (6) Evaluate n =====
             /**
-             * scores.emplace_back(n, ADist(dtable, flattened_codes_, n));
-             * 3x Faster than ADist(dtable, flattened_codes_, n)
+             * scores.emplace_back(n, ADist(dtable, rawdata, n));
+             * 3x Faster than ADist(dtable, rawdata, n)
              * Memory locality!
             */
-            scores.emplace_back(n, ADist(dtable, no, idx));
+           
+            // std::cout << query.size() << ' ' << get_single_code(no, idx).size() << '\n';
+            scores.emplace_back(n, fvec_L2sqr(query.data(), get_single_code(no, idx).data(), D_));
+
         }
 
         // std::cout << std::fixed << std::setprecision(2)
         //             << (double)bl / posting_lists_[no].size() << ' ' 
         //             << (double)br / posting_lists_[no].size() << "\t"
         //             << hit_count << ' ' << score_coarse.second << '\n';
-        if (write_trainset_) {
-            this->L[id * W_ + coarse_cnt] = (float)bl / posting_lists_[no].size();
-            this->R[id * W_ + coarse_cnt] = (float)br / posting_lists_[no].size();
-            this->distance_[id * W_ + coarse_cnt] = score_coarse.second;
-        }
+        // if (write_trainset_) {
+        //     write_l << std::fixed << std::setprecision(4) << (double)bl / posting_lists_[no].size() << ",";
+        //     write_r << std::fixed << std::setprecision(4) << (double)br / posting_lists_[no].size() << ",";
+        // }
 
-        coarse_cnt++;
-        if ( (size_t) coarse_cnt == W_ && scores.size() >= (unsigned long) topk) {
+        if ( (size_t) coarse_cnt == W_) {
             // ===== (8) Sort them =====
             topk = std::min(topk, (int)scores.size());
             std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
                                 [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+            // std::sort(scores.begin(), scores.end(),
+            //                     [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
             scores.resize(topk);
             scores.shrink_to_fit();
             // for (auto [id, dist] : scores) {
@@ -390,6 +362,10 @@ IndexIVFPQ::query(const std::vector<float>& query,
             // }
 
             // std::cout << '\n';
+            // if (write_trainset_) {
+            //     write_l << std::endl;
+            //     write_r << std::endl;
+            // }
             // timer2.stop();
             // std::cout << timer1.get_time() << ' ' << timer2.get_time() << " | " 
             //             << timer2.get_time() / (timer1.get_time() + timer2.get_time()) << '\n';
@@ -400,75 +376,49 @@ IndexIVFPQ::query(const std::vector<float>& query,
 }
 
 void 
-IndexIVFPQ::write_trainset(const std::string& dataset_name)
+IndexIVF::Clear()
 {
-    if (!write_trainset_) {
-        std::cerr << "Write trainset flag not set!" << std::endl;
-        return;
-    }
-    std::string f_suffix = ".fvecs", i_suffix = ".ivecs";
-    write_to_file_binary(L, {nq, W_}, dataset_name + "_l" + f_suffix);
-    write_to_file_binary(R, {nq, W_}, dataset_name + "_r" + f_suffix);
-    write_to_file_binary(distance_, {nq, W_}, dataset_name + "_distance" + f_suffix);
-
-    write_to_file_binary(farthest_, {kc, 1}, dataset_name + "_farthest" + f_suffix);
-    write_to_file_binary(distribution_, {kc, 20}, dataset_name + "_distribution" + i_suffix);
-
-    write_to_file_binary(querycodes_, {nq, mp}, dataset_name + "_querycodes" + i_suffix);
-    write_to_file_binary(centroidcodes_, {kc, mp}, dataset_name + "_centroidcodes" + i_suffix);
-}
-
-DistanceTable 
-IndexIVFPQ::DTable(const std::vector<float>& vec) const
-{
-    const auto& v = vec;
-    size_t Ds = centers_pq_[0][0].size();
-    assert((size_t) v.size() == mp * Ds);
-    DistanceTable dtable(mp, kp);
-    for (size_t m = 0; m < mp; ++m) {
-        for (size_t ks = 0; ks < kp; ++ks) {
-            dtable.set_value(m, ks, fvec_L2sqr(&(v[m * Ds]), centers_pq_[m][ks].data(), Ds));
-        }
-    }
-    return dtable;
+    coarse_centers_.clear();
+    flattened_codes_.clear();
+    posting_lists_.clear();
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const
+IndexIVF::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const
 {
     assert(code.size() == mp);
     float dist = 0;
     for (size_t m = 0; m < mp; ++m) {
         uint8_t ks = code[m];
-        dist += dtable.get_value(m, ks);
+        dist += dtable.GetVal(m, ks);
     }
     return dist;
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& flattened_codes, size_t n) const
+IndexIVF::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& flattened_codes, size_t n) const
 {
     float dist = 0;
     for (size_t m = 0; m < mp; ++m) {
         uint8_t ks = nth_vector_mth_element(flattened_codes, n, m);
-        dist += dtable.get_value(m, ks);
+        dist += dtable.GetVal(m, ks);
     }
     return dist;
 }
 
 float 
-IndexIVFPQ::ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const
+IndexIVF::ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const
 {
     float dist = 0;
     for (size_t m = 0; m < mp; ++m) {
         uint8_t ks = nth_vector_mth_element(list_no, offset, m);
-        dist += dtable.get_value(m, ks);
+        dist += dtable.GetVal(m, ks);
     }
     return dist;
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> >& pair_vec) const
+IndexIVF::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> >& pair_vec) const
 {
     std::pair<std::vector<size_t>, std::vector<float>> vec_pair(std::vector<size_t>(pair_vec.size()), std::vector<float>(pair_vec.size()));
     for(size_t n = 0, N = pair_vec.size(); n < N; ++n) {
@@ -478,30 +428,30 @@ IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> >&
     return vec_pair;
 }
 
-std::vector<uint8_t> 
-IndexIVFPQ::get_single_code(size_t list_no, size_t offset) const
+const std::vector<float> 
+IndexIVF::get_single_code(size_t list_no, size_t offset) const
 {
-    return std::vector<uint8_t>(db_codes_[list_no].begin() + offset * mp, 
-                            db_codes_[list_no].begin() + (offset + 1) * mp);
+    return std::vector<float>(codes_[list_no].begin() + offset * D_, 
+                            codes_[list_no].begin() + (offset + 1) * D_);
 }
 
 template<typename T>
 const std::vector<T> 
-IndexIVFPQ::nth_raw_vector(const std::vector<T>& long_code, size_t n) const
+IndexIVF::nth_raw_vector(const std::vector<T>& long_code, size_t n) const
 {
     return std::vector<T>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 uint8_t 
-IndexIVFPQ::nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, size_t m) const
+IndexIVF::nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, size_t m) const
 {
     return long_code[ n * mp + m];
 }
 
 uint8_t 
-IndexIVFPQ::nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const
+IndexIVF::nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const
 {
-    return db_codes_[list_no][ offset * mp + m];
+    return codes_[list_no][ offset * mp + m];
 }
 
 } // namespace Toy

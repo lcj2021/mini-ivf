@@ -82,6 +82,7 @@ namespace {
                 // To match the centroids and the labels, 
                 // no update should be done in the last iter. 
                 if (iter_count != iter - 1 && count > 0) {
+                // if (count > 0) {
                     std::transform(sum.begin(), sum.end(), centroids[j].begin(), [count](float val) { return val / count; });
                 }
             }

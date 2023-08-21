@@ -4,19 +4,25 @@
 #include <iostream>
 #include <numeric>
 
-#include "index_rii.h"
+#include "index_ivfpq.h"
 #include "quantizer.h"
 #include "util.h"
+
 
 size_t D = 64;              // dimension of the vectors to index
 size_t nb = 100'000;       // size of the database we plan to index
 size_t nt = 15'000;         // make a set of nt training vectors in the unit cube (could be the database)
 // size_t nb = 10'000;       // size of the database we plan to index
 // size_t nt = 1'000;         // make a set of nt training vectors in the unit cube (could be the database)
-int nq = 2'000;               // size of the queries we plan to search
+size_t mp = 32;
+size_t nq = 2'000;               // size of the queries we plan to search
 int ncentroids = 25;
 int nprobe = 10;
-size_t mp = 32;
+
+Toy::IVFPQConfig cfg(nb, D, nprobe, nb / 50, 
+                    ncentroids, 256, 
+                    1, mp, 
+                    D, D / mp);
 
 int main() {
     std::mt19937 rng;
@@ -32,25 +38,19 @@ int main() {
         }
     }
 
-    Quantizer::Quantizer pq(D, nt, mp, 1LL << 8, true);
-    pq.fit(trainvecs_flat, 10, 123);
-    const auto& codewords_pq = pq.get_centroids();
-    // assert(codewords.size() == codewords_pq.size());
-    // assert(codewords[0].size() == codewords_pq[0].size());
-    // assert(codewords[0].size() == codewords_pq[0].size());
-
     // populating (adding) the database
     std::vector<std::vector<float>> database(nb, std::vector<float>(D));
+    std::vector<float> database_flat(nb * D);
     for (size_t i = 0; i < nb; ++i) {
         for (size_t j = 0; j < D; ++j) {
             database[i][j] = distrib(rng);
+            database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexRII index(codewords_pq, D, ncentroids, mp, 8, true, false);
-    const auto& encodewords = pq.encode(database);
-    std::cout << "encodewords[0].size(): " << encodewords[0].size() << '\n';
-    index.AddCodes(encodewords, false);
-    index.Reconfigure(ncentroids, 5);
+    Toy::IndexIVFPQ index(cfg, nq, true, false);
+    index.train(database_flat, 123, false);
+    index.populate(database_flat);
+    // index.Reconfigure(ncentroids, 5);
 
     // searching the database
     std::vector<std::vector<float>> queries(nq, std::vector<float>(D));
@@ -86,8 +86,8 @@ int main() {
 
     Timer timer_query;
     timer_query.start();
-    for (size_t i = 0; i < nq; ++i) {
-        tie(nnid[i], dist[i]) = index.query(queries[i], std::vector<int>{}, k, nb, nprobe);
+    for (size_t q = 0; q < nq; ++q) {
+        tie(nnid[q], dist[q]) = index.query(queries[q], std::vector<int>{}, k, nb, q);
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";

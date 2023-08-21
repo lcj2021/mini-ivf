@@ -3,54 +3,53 @@
 #include <numeric>
 #include <unordered_set>
 
-#include "hdf5_io.h"
-#include "index_rii.h"
+#include "binary_io.h"
+#include "index_ivfpq.h"
 #include "quantizer.h"
 #include "util.h"
 
-size_t D;              // dimension of the vectors to index
-size_t nb;       // size of the database we plan to index
-size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t D;           // dimension of the vectors to index
+size_t nb;          // size of the database we plan to index
+size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 64;
+size_t nq = 1000'000;
 int ncentroids = 100;
 int nprobe = 6;
 
-size_t nbits = 8;
-
 int main() {
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file(database, "../../dataset/sift-128-euclidean.hdf5", "train");
+    std::tie(nb, D) = load_from_file_binary(database, "../../dataset/sift/sift_base.fvecs");
 
-    std::vector<float> query;
-    auto [nq, _] = load_from_file(query, "../../dataset/sift-128-euclidean.hdf5", "test");
+    const auto& query = database;
 
     std::vector<int> gt;
-    load_from_file(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
+    load_from_file_binary(gt, "../../dataset/sift/sift_train_groundtruth.ivecs");
 
-    Quantizer::Quantizer PQ(D, nb, mp, 1LL << nbits, true);
-    PQ.fit(database, 5, 123);
-    const auto& codewords_cq = PQ.get_centroids();
-    
-    Toy::IndexRII index(codewords_cq, D, ncentroids, mp, nbits, true, false);
-    const auto& encodewords = PQ.encode(database);
-    index.AddCodes(encodewords, false);
-    index.Reconfigure(ncentroids, 5);
+    Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
+                    ncentroids, 256, 
+                    1, mp, 
+                    D, D / mp);
+    Toy::IndexIVFPQ index(cfg, nq, true, true);
+    index.train(database, 123, false);
+    index.populate(database);
 
     puts("Index find kNN!");
     // Recall@k
     int k = 100;
-    nq = 1'000;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
     timer_query.start();
+#pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         tie(nnid[q], dist[q]) = index.query(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, nprobe);
+            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
+
+    index.write_trainset("../../dataset/sift/LRF_train/sift1m_1m_kc100");
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

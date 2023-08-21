@@ -1,80 +1,12 @@
-
 cmake_minimum_required(VERSION 3.10)
 
 project(Toy)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(test_rii 
-    src/test_rii.cpp
-    src/index_rii.h
-    src/pqkmeans.cpp
-    src/quantizer.cpp
-)
-
-add_executable(test_ivfpq
-    src/test_ivfpq.cpp
-    src/index_ivfpq.h
-    src/pqkmeans.cpp
-    src/quantizer.cpp
-)
-
-add_executable(test_rii_sift1m 
-    src/test_rii_sift1m.cpp
-    src/index_rii.h
-    src/pqkmeans.cpp
-    src/quantizer.cpp
-)
-
-add_executable(test_ivfpq_sift1m 
-    src/test_ivfpq_sift1m.cpp
-    src/index_ivfpq.h
-    src/pqkmeans.cpp
-    src/quantizer.cpp
-)
-
-target_compile_options(test_ivfpq PRIVATE
-    -Ofast
-    -march=native
-    -mtune=native
-)
-
-target_compile_options(test_rii PRIVATE
-    -Ofast
-    -march=native
-    -mtune=native
-)
-
-target_compile_options(test_rii_sift1m PRIVATE
-    -Ofast
-    -march=native
-    -mtune=native
-)
-
-target_compile_options(test_ivfpq_sift1m PRIVATE
-    -Ofast
-    -march=native
-    -mtune=native
-)
-
-set(OpenMP "/var/lib/docker/lcj_graph_partitioning/mpi/openmpi-1.4.5")
-find_package(OpenMP REQUIRED)
-include_directories(${OpenMP_CXX_INCLUDE_DIRS})
-# set(MPI "/var/lib/docker/lcj_graph_partitioning/mpi/openmpi-1.4.5")
-# find_package(MPI REQUIRED)
-
-
-# if(MPI_CXX_FOUND)
-#     include_directories(${MPI_CXX_INCLUDE_DIRS})
-#     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
-#     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
-#     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${MPI_CXX_LINK_FLAGS}")
-#     message("MPI found: ${MPI_CXX_INCLUDE_DIRS}")
-#     else()
-#     message(WARNING "MPI NOT found")
-# endif()
-
 # set(HDF5_ROOT "/var/lib/docker/lcj_ym_IR/hdf5/install_path")
+# handle fatal error: H5Cpp.h: No such file or directory
+# include <H5Cpp.h>
 find_package(HDF5 REQUIRED COMPONENTS CXX)
 if (NOT HDF5_FOUND)
 	message(WARNING "hdf5 library not found, some tests will not be run")
@@ -82,29 +14,15 @@ else()
     include_directories(${HDF5_INCLUDE_DIR})
 endif()
 
+set(OpenMP "/var/lib/docker/lcj_graph_partitioning/mpi/openmpi-1.4.5")
+find_package(OpenMP REQUIRED)
+include_directories(${OpenMP_CXX_INCLUDE_DIRS})
 
-target_link_libraries(test_rii PRIVATE
-    ${MPI_CXX_LIBRARIES}
-    # OpenMP::OpenMP_CXX
-)
+set(SRC_DIR "src")  
+set(TESTS_DIR "tests")
 
-target_link_libraries(test_ivfpq PRIVATE
-    ${MPI_CXX_LIBRARIES}
-    OpenMP::OpenMP_CXX
-)
+add_subdirectory(src)
+add_subdirectory(tests)
 
-target_link_libraries(test_rii_sift1m PRIVATE
-    ${HDF5_LIBRARIES}
-    ${MPI_CXX_LIBRARIES}
-    OpenMP::OpenMP_CXX
-)
-
-target_link_libraries(test_ivfpq_sift1m PRIVATE
-    ${HDF5_LIBRARIES}
-    ${MPI_CXX_LIBRARIES}
-    OpenMP::OpenMP_CXX
-)
-
-message("HDF5 LIB: ${HDF5_LIBRARIES}")
-message("HDF5 INC: ${HDF5_INCLUDE_DIRS}")
-
+# set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+# set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
