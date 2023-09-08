@@ -59,18 +59,32 @@ public:
     void populate(const std::vector<float>& rawdata);
     void train(const std::vector<float>& traindata, int seed, bool need_split);
 
-    std::pair<std::vector<size_t>, std::vector<float>> query(const std::vector<float>& query,
+    // IVFPQ baseline
+    std::pair<std::vector<size_t>, std::vector<float>> query_baseline(const std::vector<float>& query,
                                                              const std::vector<int>& gt,
                                                              int topk,
                                                              int L,
                                                              int id);
+    // IVFPQ baseline
+    std::pair<std::vector<size_t>, std::vector<float>> query_pred(const std::vector<float>& query,
+                                                             const std::vector<int>& pred_radius,
+                                                             int topk,
+                                                             int L,
+                                                             int id);
+    // For observation
     std::pair<std::vector<size_t>, std::vector<float>> query_obs(const std::vector<float>& query,
                                                              const std::vector<int>& gt,
                                                              int topk,
                                                              int L,
                                                              int id);
+    // Write train set
+    std::pair<std::vector<size_t>, std::vector<float>> query_exhausted(const std::vector<float>& query,
+                                                             const std::vector<int>& gt,
+                                                             int topk,
+                                                             int L,
+                                                             int id);
     void insert_ivf(const std::vector<float>& rawdata);
-    void write_trainset(const std::string& dataset_name, int train_type);
+    void write_trainset(std::string dataset_name, int type);
 
     DistanceTable DTable(const std::vector<float>& vec) const;
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
@@ -283,7 +297,7 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
 }
 
 std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::query(const std::vector<float>& query,
+IndexIVFPQ::query_baseline(const std::vector<float>& query,
                                             const std::vector<int>& gt,
                                             int topk,
                                             int L,
@@ -334,10 +348,6 @@ IndexIVFPQ::query(const std::vector<float>& query,
             scores.emplace_back(n, ADist(dtable, no, idx));
         }
 
-        // std::cout << std::fixed << std::setprecision(2)
-        //             << (double)bl / posting_lists_[no].size() << ' ' 
-        //             << (double)br / posting_lists_[no].size() << "\t"
-        //             << hit_count << ' ' << score_coarse.second << '\n';
         if (write_trainset_) {
             auto&& cl = this->L[id * kc + coarse_cnt];
             auto&& cr = this->R[id * kc + coarse_cnt];
@@ -371,6 +381,67 @@ IndexIVFPQ::query(const std::vector<float>& query,
             // timer2.stop();
             // std::cout << timer1.get_time() << ' ' << timer2.get_time() << " | " 
             //             << timer2.get_time() / (timer1.get_time() + timer2.get_time()) << '\n';
+            return PairVectorToVectorPair(scores);  // return pair<vec, vec>
+        }
+    }
+    return std::pair<std::vector<size_t>, std::vector<float>>({}, {});
+}
+
+std::pair<std::vector<size_t>, std::vector<float> > 
+IndexIVFPQ::query_pred(const std::vector<float>& query,
+                                            const std::vector<int>& pred_radius,
+                                            int topk,
+                                            int L,
+                                            int id)
+{
+    DistanceTable dtable = DTable(query);
+
+    std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
+    float min_cluster_dist = std::numeric_limits<float>::max();
+    for (size_t no = 0; no < kc; ++no) {
+        scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
+        min_cluster_dist = std::min(min_cluster_dist, scores_coarse[no].second);
+    }
+
+    std::vector<std::pair<size_t, float>> scores;
+    scores.reserve(L);
+    int coarse_cnt = 0;
+    for (const auto& score_coarse : scores_coarse) {
+        size_t no = score_coarse.first;
+        size_t posting_lists_len = posting_lists_[no].size();
+
+        int radius = pred_radius[no];
+        float cq = (float)score_coarse.second / min_cluster_dist;
+        float radius_f = (float)radius / segs;
+        float bl_f = cq - radius_f;
+        float br_f = cq + radius_f;
+        bl_f -= (float)3.5 / segs;
+        br_f -= (float)3.5 / segs;
+        bl_f = std::min(1.0f, bl_f);
+        bl_f = std::max(0.0f, bl_f);
+        br_f = std::max(1.0f, br_f);
+        br_f = std::max(0.0f, br_f);
+        size_t bl = bl_f * posting_lists_len;
+        size_t br = br_f * posting_lists_len;
+        if (radius == 0) {
+            goto end_of_current_cluster;
+        }
+
+        for (size_t idx = bl; idx < br; ++idx) {
+            const auto& n = posting_lists_[no][idx];
+            scores.emplace_back(n, ADist(dtable, no, idx));
+        }
+
+end_of_current_cluster: 
+        coarse_cnt++;
+        if (coarse_cnt == W_) {
+            topk = std::min(topk, (int)scores.size());
+            std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                            [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                                return a.second < b.second;
+                            });
+            scores.resize(topk);
+            scores.shrink_to_fit();
             return PairVectorToVectorPair(scores);  // return pair<vec, vec>
         }
     }
@@ -432,37 +503,117 @@ IndexIVFPQ::query_obs(const std::vector<float>& query,
         }
 
         coarse_cnt++;
-        if ( (size_t) coarse_cnt == W_ && scores.size() >= (unsigned long) topk) {
-            topk = std::min(topk, (int)scores.size());
-            std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
-                                [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
-            scores.resize(topk);
-            scores.shrink_to_fit();
-            return PairVectorToVectorPair(scores);  // return pair<vec, vec>
-        }
     }
-    return std::pair<std::vector<size_t>, std::vector<float>>({}, {});
+    topk = std::min(topk, (int)scores.size());
+    std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                    [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                        return a.second < b.second;
+                    });
+    scores.resize(topk);
+    scores.shrink_to_fit();
+    return PairVectorToVectorPair(scores);  // return pair<vec, vec>
+}
+
+std::pair<std::vector<size_t>, std::vector<float> > 
+IndexIVFPQ::query_exhausted(const std::vector<float>& query,
+                                            const std::vector<int>& gt,
+                                            int topk,
+                                            int L,
+                                            int id)
+{
+    if (!write_trainset_) {
+        std::cerr << "write_trainset_ not set!" << std::endl;
+        throw;
+    }
+
+    DistanceTable dtable = DTable(query);
+
+    std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
+    float min_cluster_dist = std::numeric_limits<float>::max();
+    for (size_t no = 0; no < kc; ++no) {
+        scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
+        min_cluster_dist = std::min(min_cluster_dist, scores_coarse[no].second);
+    }
+
+    std::unordered_set<int> gt_set;
+    gt_set = std::unordered_set<int>(gt.begin(), gt.end());
+    assert(query.size() == D_);
+    for (size_t d = 0; d < D_; ++d) {
+        queryraw_[id * D_ + d] = query[d];
+    }
+
+    std::vector<std::pair<size_t, float>> scores;
+    scores.reserve(L);
+    int coarse_cnt = 0;
+    for (const auto& score_coarse : scores_coarse) {
+        size_t no = score_coarse.first;
+        size_t bl = posting_lists_[no].size(), br = 0;
+        size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
+
+        for (size_t idx = 0; idx < posting_lists_len; ++idx) {
+            const auto& n = posting_lists_[no][idx];
+            if (gt_set.count(n)) {
+                bl = std::min(bl, idx);
+                br = std::max(br, idx);
+                hit_count ++;
+            }
+            scores.emplace_back(n, ADist(dtable, no, idx));
+        }
+
+        auto&& cl = this->L[id * kc + coarse_cnt];
+        auto&& cr = this->R[id * kc + coarse_cnt];
+        auto&& cq = this->Q[id * kc + coarse_cnt];
+        auto&& cd = this->distance_[id * kc + coarse_cnt];
+        auto&& cradius = this->radius_[id * kc + coarse_cnt];
+
+        cl = (float)bl / posting_lists_[no].size();
+        cr = (float)br / posting_lists_[no].size();
+        cq = (float)score_coarse.second / posting_dist_lists_[no].back();
+        cd = (float)score_coarse.second / min_cluster_dist;
+
+        cradius = 0;
+        if (cl <= cr) {
+            cradius = (int)ceil(cr - cl + 1e-6);
+        }
+
+        coarse_cnt++;
+    }
+    topk = std::min(topk, (int)scores.size());
+    std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                    [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                        return a.second < b.second;
+                    });
+    scores.resize(topk);
+    scores.shrink_to_fit();
+    return PairVectorToVectorPair(scores);  // return pair<vec, vec>
 }
 
 void 
-IndexIVFPQ::write_trainset(const std::string& dataset_name, int train_type)
+IndexIVFPQ::write_trainset(std::string dataset_name, int type)
 {
     if (!write_trainset_) {
         std::cerr << "Write trainset flag not set!" << std::endl;
         return;
     }
+    if (dataset_name.back() != '/') {
+        dataset_name += "/";
+    }
     std::string prefix;
-    if (train_type == 0) {
+    if (type == 0) {
         prefix = "train_";
-    } else if (train_type == 1) {
+    } else if (type == 1) {
         prefix = "tuning_";
     } else {
         throw;
     }
     std::string f_suffix = ".fvecs", i_suffix = ".ivecs";
-    // write_to_file_binary(L, {nq, W_}, dataset_name + prefix + "l" + f_suffix);
-    // write_to_file_binary(R, {nq, W_}, dataset_name + prefix + "r" + f_suffix);
-    write_to_file_binary(distance_, {nq, W_}, dataset_name + prefix + "distance" + f_suffix);
+    // write_to_file_binary(L, {nq, kc}, dataset_name + prefix + "l" + f_suffix);
+    // write_to_file_binary(R, {nq, kc}, dataset_name + prefix + "r" + f_suffix);
+    write_to_file_binary(distance_, {nq, kc}, dataset_name + prefix + "distance" + f_suffix);
+    write_to_file_binary(Q, {nq, kc}, dataset_name + prefix + "q" + f_suffix);
+    write_to_file_binary(queryraw_, {nq, D_}, dataset_name + prefix + "query" + f_suffix);
+
+    write_to_file_binary(radius_, {nq, kc}, dataset_name + prefix + "radius" + i_suffix);
 }
 
 DistanceTable 

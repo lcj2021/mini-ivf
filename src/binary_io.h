@@ -113,6 +113,7 @@ void write_to_file_binary(const std::vector<T>& data, std::pair<size_t, size_t> 
         throw;
     }
     auto [N, D] = dimension;
+    assert(data.size() == N * D);
 
     // char sep[4] = {(char)D, 0, 0, 0};
     int sep = D;
