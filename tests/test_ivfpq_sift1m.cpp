@@ -13,28 +13,28 @@ size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 64;
-size_t nq = 10'000;
+size_t nq = 5;
+size_t segs = 20;
 int ncentroids = 100;
 int nprobe = 100;
 
 int main() {
     std::vector<float> database;
-    // std::tie(nb, D) = load_from_file_hdf5(database, "../../dataset/sift-128-euclidean.hdf5", "train");
-    std::tie(nb, D) = load_from_file_binary(database, "../../dataset/sift/sift_base.fvecs");
+    std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
-    std::vector<float> query;
-    // auto [nq, _] = load_from_file_hdf5(query, "../../dataset/sift-128-euclidean.hdf5", "test");
-    query = database;
+    auto& query = database;
+    // std::vector<float> query;
+    // load_from_file_binary(query, "/RF/dataset/sift/sift_query.fvecs");
 
     std::vector<int> gt;
-    // load_from_file_hdf5(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
-    load_from_file_binary(gt, "../../dataset/sift/sift_train_groundtruth.ivecs");
+    load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
+    // load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
                     1, mp, 
-                    D, D / mp);
-    Toy::IndexIVFPQ index(cfg, nq, true, false);
+                    D, D / mp, segs);
+    Toy::IndexIVFPQ index(cfg, nq, true, true);
     index.train(database, 123, true);
     index.populate(database);
 
@@ -45,9 +45,12 @@ int main() {
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
     timer_query.start();
-#pragma omp parallel for
+// #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        tie(nnid[q], dist[q]) = index.query(
+        // tie(nnid[q], dist[q]) = index.query(
+        //     std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+        //     std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
+        tie(nnid[q], dist[q]) = index.query_obs(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
     }

@@ -114,7 +114,8 @@ void write_to_file_binary(const std::vector<T>& data, std::pair<size_t, size_t> 
     }
     auto [N, D] = dimension;
 
-    char sep[4] = {(char)D, 0, 0, 0};
+    // char sep[4] = {(char)D, 0, 0, 0};
+    int sep = D;
     // 4 + d * sizeof(T) for each vector
     for (size_t n = 0; n < N; ++n) {
         file.write(reinterpret_cast<char*>(&sep), 4);

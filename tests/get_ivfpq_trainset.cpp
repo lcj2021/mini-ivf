@@ -13,6 +13,7 @@ size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 64;
 size_t nq = 1000'000;
+size_t segs = 20;
 int ncentroids = 100;
 int nprobe = 6;
 
@@ -28,7 +29,7 @@ int main() {
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
                     1, mp, 
-                    D, D / mp);
+                    D, D / mp, segs);
     Toy::IndexIVFPQ index(cfg, nq, true, true);
     index.train(database, 123, false);
     index.populate(database);
@@ -49,7 +50,7 @@ int main() {
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.write_trainset("../../dataset/sift/LRF_train/sift1m_1m_kc100");
+    index.write_trainset("../../dataset/sift/LRF_train/sift1m_1m_kc100", 0);
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

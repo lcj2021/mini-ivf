@@ -1,4 +1,5 @@
 release/
+build/
 .git/
 
 # Prerequisites
