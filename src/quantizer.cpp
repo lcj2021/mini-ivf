@@ -1,5 +1,7 @@
 #include "quantizer.h"
 #include "kmeans.h"
+#include "binary_io.h"
+#include "util.h"
 #include <algorithm>
 #include <tuple>
 namespace Quantizer {
@@ -94,6 +96,32 @@ Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>>& cen
 {
     assert(centers_new.size() == M_);
     centers_ = centers_new;
+}
+
+void 
+Quantizer::load(std::string quantizer_path)
+{
+    std::string center_suffix = "centers.fvecs";
+    std::string assign_suffix = "assignments.ivecs";
+    std::vector<float> flat_center;
+    // std::vector<int> flat_assign;
+    load_from_file_binary(flat_center, quantizer_path + center_suffix);
+    // load_from_file_binary(flat_assign, quantizer_path + assign_suffix);
+    this->centers_ = nest(flat_center, std::vector<size_t>{M_, K_, Ds_});
+    // this->assignments_ = nest(flat_assign, std::vector<size_t>{M_, K_, Ds_});
+    // load_from_file_binary(assignments_, quantizer_path + assign_suffix);
+}
+
+void 
+Quantizer::write(std::string quantizer_path)
+{
+    std::string center_suffix = "centers.fvecs";
+    std::string assign_suffix = "assignments.ivecs";
+
+    auto flat_center = flatten(this->centers_);
+    // auto flat_assign = flatten(this->assignments_);
+    write_to_file_binary(flat_center, {1, M_ * K_ * Ds_}, quantizer_path + center_suffix);
+    // write_to_file_binary(assignments_, quantizer_path + assign_suffix);
 }
 
 std::vector<std::vector<uint8_t>> 

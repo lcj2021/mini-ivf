@@ -21,6 +21,8 @@ public:
     const std::vector<std::vector<int>>& get_assignments();
 
     void set_centroids(const std::vector<std::vector<std::vector<float>>>& centers_new);
+    void load(std::string quantizer_path);
+    void write(std::string quantizer_path);
     const std::vector<std::vector<std::vector<float>>>& get_centroids();
     std::vector<std::vector<uint8_t>> encode(const std::vector<float>& rawdata);
     std::vector<std::vector<uint8_t>> encode(const std::vector<std::vector<float>>& rawdata);
@@ -36,7 +38,7 @@ private:
     // centers for clustering. shape = M_ * K_ * Ds_
     std::vector<std::vector<std::vector<float>>> centers_;  
     // assignement for each intput vector. shape = M_ * N
-    // assignments_[m][n] in [0, K_]
+    // assignments_[m][n] in [0, K_)
     std::vector<std::vector<int>> assignments_;  
 
     // Given a long (N * M) codes, pick up n-th code

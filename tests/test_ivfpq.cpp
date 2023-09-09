@@ -88,7 +88,8 @@ int main() {
     Timer timer_query;
     timer_query.start();
     for (size_t q = 0; q < nq; ++q) {
-        tie(nnid[q], dist[q]) = index.query_baseline(queries[q], std::vector<int>{}, k, nb, q);
+        const auto& res = index.query_baseline(queries[q], k, nb, q);
+        tie(nnid[q], dist[q]) = res.first;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";

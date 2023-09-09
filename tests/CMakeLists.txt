@@ -10,7 +10,9 @@ set(TEST_SOURCES
     # test_deep10M.cpp
     test_ivf.cpp
     test_ivfpq.cpp
-    test_ivfpq_sift1m.cpp
+    test_ivfpq_sift1m_baseline.cpp
+    test_ivfpq_sift1m_pred.cpp
+    test_ivfpq_sift1m_obs.cpp
     test_ivf_sift1m.cpp
     test_rii.cpp
     test_rii_pred_sift1m.cpp
