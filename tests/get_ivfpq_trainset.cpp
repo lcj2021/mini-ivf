@@ -11,8 +11,8 @@
 size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 128;
-size_t nq = 1000'000;
+size_t mp = 64;
+size_t nq = 10'000;
 size_t segs = 20;
 int ncentroids = 100;
 int nprobe = ncentroids;
@@ -42,18 +42,26 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
 #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        tie(nnid[q], dist[q]) = index.query_exhausted(
+        // tie(nnid[q], dist[q]) = index.query_exhausted(
+        //     std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+        //     std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
+        size_t searched_cnt;
+        index.query_exhausted(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
+            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
+            nnid[q], dist[q], searched_cnt, 
+             k, nb, q);
+        total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.write_trainset("/RF/dataset/sift/sift1m_pq128_1m_kc100_seg20", 0);
+    index.write_trainset("/RF/dataset/sift/sift1m_pq64_10k_kc100_seg20", 0);
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

@@ -16,9 +16,9 @@ size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
 int ncentroids = 100;
-int nprobe = ncentroids;
 
-int main() {
+int main(int argc, char* argv[]) {
+    assert(argc == 4);
     std::vector<float> database;
     std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
@@ -31,8 +31,13 @@ int main() {
     load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
     std::vector<int> pred_radius;
+    // "/RF/dataset/sift/sift1m_pq128_100k_kc100_seg20/pred.ivecs"
+    std::string pred_path = std::string(argv[3]);
     std::tie(n_pred, d_pred) = load_from_file_binary(pred_radius, 
-                "/RF/dataset/sift/sift1m_pq128_10k_kc100_seg20/pred.ivecs");
+                pred_path);
+    
+    int cut = std::atoi(argv[1]);
+    int nprobe = std::atoi(argv[2]);
 
     assert(d_pred == ncentroids);
 
@@ -40,9 +45,11 @@ int main() {
                     ncentroids, 256, 
                     1, mp, 
                     D, D / mp, segs);
-    Toy::IndexIVFPQ index(cfg, nq, true, true);
+    Toy::IndexIVFPQ index(cfg, nq, true, false);
     // index.train(database, 123, true);
-    index.load("/RF/index/sift/sift1m_pq128_kc100");
+    std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
+                        + "_kc" + std::to_string(ncentroids);
+    index.load(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -50,17 +57,18 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    size_t searched_cnt = 0;
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
 // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        const auto& res = index.query_pred(
-            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(pred_radius.begin() + q * d_pred, pred_radius.begin() + q * d_pred + k), 
-            k, nb, q);
-        tie(nnid[q], dist[q]) = res.first;
-        searched_cnt += res.second;
+        size_t searched_cnt;
+        index.query_pred(
+            std::vector<float>(query.data() + q * D, query.data() + (q + 1) * D), 
+            std::vector<int>(pred_radius.data() + q * d_pred, pred_radius.data() + q * d_pred + k), 
+            nnid[q], dist[q], searched_cnt, 
+            cut, k, nb, q);
+        total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
@@ -72,8 +80,11 @@ int main() {
             if (S.count(nnid[q][i]))
                 n_ok++;
     }
-    std::cout << (double)n_ok / (nq * k) << '\n';
-    std::cout << "avg_searched_cnt: " << (double)searched_cnt / nq << '\n';
+    std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
+    std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
+    printf("PQ%lu, segs%lu, kc%d, W%d\n", mp, segs, ncentroids, nprobe);
+    printf("cut%d\n", cut);
+    std::cout << "pred_path: " << pred_path << '\n';
 
     return 0;
 }

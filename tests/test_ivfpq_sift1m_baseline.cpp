@@ -15,9 +15,9 @@ size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
 int ncentroids = 100;
-int nprobe = 10;
 
-int main() {
+int main(int argc, char* argv[]) {
+    assert(argc == 2);
     std::vector<float> database;
     std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
@@ -29,13 +29,18 @@ int main() {
     // load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
     load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
+    int nprobe = std::atoi(argv[1]);
+
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
                     1, mp, 
                     D, D / mp, segs);
     Toy::IndexIVFPQ index(cfg, nq, true, false);
     // index.train(database, 123, true);
-    index.load("/RF/index/sift/sift1m_pq128_kc100");
+    // index.write("/RF/index/sift/sift1m_pq64_kc100");
+    std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
+                        + "_kc" + std::to_string(ncentroids);
+    index.load(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -43,16 +48,17 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    size_t searched_cnt = 0;
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
 // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        const auto& res = index.query_baseline(
+        size_t searched_cnt;
+        index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+            nnid[q], dist[q], searched_cnt, 
              k, nb, q);
-        tie(nnid[q], dist[q]) = res.first;
-        searched_cnt += res.second;
+        total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
@@ -65,7 +71,7 @@ int main() {
                 n_ok++;
     }
     std::cout << (double)n_ok / (nq * k) << '\n';
-    std::cout << "avg_searched_cnt: " << (double)searched_cnt / nq << '\n';
+    std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
 
     return 0;
 }
