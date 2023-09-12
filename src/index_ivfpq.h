@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cassert>
 #include <unordered_set>
+#include <bitset>
 #include <fstream>
 #include "util.h"
 #include "quantizer.h"
@@ -114,8 +115,7 @@ public:
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
     float ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const;
 
-    std::pair<std::vector<size_t>, std::vector<float>> 
-    PairVectorToVectorPair(const std::vector<std::pair<size_t, float>>& pair_vec) const;
+    void get_direction_code(const std::vector<float>& vec, int id, int& direction_code);
 
     std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
@@ -142,9 +142,12 @@ public:
     std::vector<std::vector<float>> posting_dist_lists_;  // (NumList, any)
 
     std::vector<float> L, R, Q, distance_, queryraw_;
-    std::vector<int> radius_;
+    std::vector<int> radius_, direction_;
 
     std::vector<std::vector<std::pair<int, int>>> direction_cnt;
+    size_t direction_code_bit = 8;
+    std::vector<int> direction4cluster;     // kc * direction_code_bit
+    std::vector<std::vector<int>> direction_code4db_code_;
 };
 
 
@@ -160,6 +163,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool wri
     pq_ = nullptr;
 
     direction_cnt.resize(kc, std::vector<std::pair<int, int>>(D_));
+    direction4cluster.resize(kc * direction_code_bit);
 
     if (write_trainset) {
         L.resize(nq * kc);
@@ -167,6 +171,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool wri
         Q.resize(nq * kc);
         distance_.resize(nq * kc);
         radius_.resize(nq * kc);
+        direction_.resize(nq * kc);
 
         queryraw_.resize(nq * D_);
     }
@@ -207,6 +212,46 @@ IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, bool need_split)
     centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
     labels_cq_ = cq_->get_assignments()[0];
 
+#pragma omp parallel for
+    for (size_t i = 0; i < Nt_; ++i) {
+        const auto& vec = nth_raw_vector(*traindata, i);
+        for (size_t no = 0; no < kc; ++no) {
+            for (size_t d = 0; d < D_; ++d) {
+                float delta = vec[d] - centers_cq_[no][d];
+                if (delta < 0) {
+                    direction_cnt[no][d].first++;
+                } else if (delta > 0) {
+                    direction_cnt[no][d].second++;
+                }
+            }
+        }
+    }
+
+    std::vector<std::vector<std::pair<int, int>>> delta(kc, std::vector<std::pair<int, int>>(D_));
+    for (size_t no = 0; no < kc; ++no) {
+        for (size_t d = 0; d < D_; ++d) {
+            delta[no][d].first = d;
+            delta[no][d].second = 
+                std::abs(direction_cnt[no][d].first - direction_cnt[no][d].second);
+        }
+        std::sort(delta[no].begin(), delta[no].end(), 
+            [](const auto& a, const auto& b) {
+                return a.second < b.second;
+        });
+        std::cerr << "Cluster no: " << no << ' ';
+        for (size_t d = 0; d < direction_code_bit; ++d) {
+            direction4cluster[no * direction_code_bit + d] = delta[no][d].second;
+        }
+        for (size_t d = 0; d < 16; ++d) {
+            std::cerr << delta[no][d].second << "|" << delta[no][d].first << ' ';
+        }
+        std::cerr << "... ";
+        for (size_t d = D_ - 4; d < D_; ++d) {
+            std::cerr << delta[no][d].second << "|" << delta[no][d].first << ' ';
+        }
+        std::cerr << std::endl;
+    }
+
     // std::vector<size_t> labels_cnt(kc);
     // for (auto label : labels_cq_) {
     //     labels_cnt[label] ++;
@@ -231,9 +276,16 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
 
 #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
-        int id = cq_->predict_one(nth_raw_vector(rawdata, n), 0);
+        const auto& vec = nth_raw_vector(rawdata, n);
+        int id = cq_->predict_one(vec, 0);
+        
+        int direction_code = 0;
+        get_direction_code(vec, id, direction_code);
+        // std::bitset<16> bits(direction_code);
+        // std::cerr << bits << std::endl;
         #pragma omp critical
         {
+            direction_code4db_code_[id].emplace_back(direction_code);
             posting_lists_[id].emplace_back(n);
             posting_dist_lists_[id].emplace_back(0);
         }
@@ -259,8 +311,8 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
          * @warning Because db_codes_ has not initialized yet!
         */
         for (size_t i = 0; i < pdlist.size(); ++i) {
-            // pdlist[i] = fvec_L2sqr(center.data(), nth_raw_vector(rawdata, plist[i]).data(), D_);
-            pdlist[i] = ADist(dtable, pqcodes[plist[i]]);
+            pdlist[i] = fvec_L2sqr(center.data(), nth_raw_vector(rawdata, plist[i]).data(), D_);
+            // pdlist[i] = ADist(dtable, pqcodes[plist[i]]);
         }
 
         std::sort(indices.begin(), indices.end(), [&](size_t a, size_t b) {
@@ -298,11 +350,16 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
 
     posting_lists_.clear();
     posting_lists_.resize(kc);
+    direction_code4db_code_.clear();
+    direction_code4db_code_.resize(kc);
     db_codes_.clear();
     db_codes_.resize(kc);
     posting_dist_lists_.clear();
     posting_dist_lists_.resize(kc);
 
+    for (auto& direction_code4db_code : direction_code4db_code_) {
+        direction_code4db_code.reserve(N_ / kc);  // Roughly malloc
+    }
     for (auto& posting_list : posting_lists_) {
         posting_list.reserve(N_ / kc);  // Roughly malloc
     }
@@ -334,6 +391,9 @@ IndexIVFPQ::load(std::string index_path)
     centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
     centers_pq_ = pq_->get_centroids();
 
+    std::string direction4cluster_suffix = "direction4cluster.ivecs";
+    load_from_file_binary(direction4cluster, index_path + direction4cluster_suffix);
+
     is_trained_ = true;
 }
 
@@ -346,6 +406,9 @@ IndexIVFPQ::write(std::string index_path)
     std::string cq_suffix = "cq_", pq_suffix = "pq_";
     cq_->write(index_path + cq_suffix);
     pq_->write(index_path + pq_suffix);
+
+    std::string direction4cluster_suffix = "direction4cluster.ivecs";
+    write_to_file_binary(direction4cluster, {kc, direction_code_bit}, index_path + direction4cluster_suffix);
 }
 
 
@@ -375,8 +438,7 @@ IndexIVFPQ::query_baseline(const std::vector<float>& query,
     size_t coarse_cnt = 0;
     for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
-        size_t bl = posting_lists_[no].size(), br = 0;
-        size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
+        size_t posting_lists_len = posting_lists_[no].size();
 
         for (size_t idx = 0; idx < posting_lists_len; ++idx) {
             const auto& n = posting_lists_[no][idx];
@@ -482,7 +544,6 @@ end_of_current_cluster:
     }
 }
 
-// std::pair<std::vector<size_t>, std::vector<float> > 
 void
 IndexIVFPQ::query_obs(const std::vector<float>& query,
                                             const std::vector<int>& gt,
@@ -494,65 +555,61 @@ IndexIVFPQ::query_obs(const std::vector<float>& query,
                                             int id)
 {
     std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
-    // DistanceTable dtable = DTable(query);
+    DistanceTable dtable = DTable(query);
 
-    // float min_cluster_dist = std::numeric_limits<float>::max();
+    float min_cluster_dist = std::numeric_limits<float>::max();
     for (size_t no = 0; no < kc; ++no) {
         scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
-        // min_cluster_dist = std::min(min_cluster_dist, scores_coarse[no].second);
+        min_cluster_dist = std::min(min_cluster_dist, scores_coarse[no].second);
     }
 
-    // std::unordered_set<int> gt_set;
-    // gt_set = std::unordered_set<int>(gt.begin(), gt.end());
+    std::unordered_set<int> gt_set;
+    gt_set = std::unordered_set<int>(gt.begin(), gt.end());
 
     std::vector<std::pair<size_t, float>> scores;
     scores.reserve(L);
     int coarse_cnt = 0;
-    // printf("===== Query %d =====\n", id);
+    printf("===== Query %d =====\n", id);
     for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
-        // size_t bl = posting_lists_[no].size(), br = 0;
-        // size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
+        size_t bl = posting_lists_[no].size(), br = 0;
+        size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
 
-        // for (size_t idx = 0; idx < posting_lists_len; ++idx) {
-        //     const auto& n = posting_lists_[no][idx];
-        //     if (gt_set.count(n)) {
-        //         bl = std::min(bl, idx);
-        //         br = std::max(br, idx);
-        //         hit_count ++;
-        //     }
-        //     scores.emplace_back(n, ADist(dtable, no, idx));
-        // }
-
-        // auto cl = (float)bl / posting_lists_[no].size();
-        // auto cr = (float)br / posting_lists_[no].size();
-        // auto cq = (float)score_coarse.second / posting_dist_lists_[no].back();
-        // auto cd = (float)score_coarse.second / min_cluster_dist;
-
-        // auto cradius = 0;
-        // if (cl <= cr) {
-        //     cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
-        // }
-        // if (cl <= cr) {
-        //     std::cerr << std::fixed << std::setprecision(2) 
-        //             << cl << ' ' << cr << ' ' << cq << ' ' << cd 
-        //             << ' ' << cradius << ' ' << hit_count;
-        //     if (cr <= cq) {
-        //         std::cerr << " <=====";
-        //     } else if (cq <= cl) {
-        //         std::cerr << " =====>";
-        //     }
-        //     std::cerr << std::endl;
-        // }
-
-        for (size_t d = 0; d < D_; ++d) {
-            float delta = query[d] - centers_cq_[no][d];
-            if (delta < 0) {
-                direction_cnt[no][d].first++;
-            } else if (delta > 0) {
-                direction_cnt[no][d].second++;
+        for (size_t idx = 0; idx < posting_lists_len; ++idx) {
+            const auto& n = posting_lists_[no][idx];
+            if (gt_set.count(n)) {
+                bl = std::min(bl, idx);
+                br = std::max(br, idx);
+                hit_count ++;
             }
+            scores.emplace_back(n, ADist(dtable, no, idx));
         }
+
+        auto cl = (float)bl / posting_lists_[no].size();
+        auto cr = (float)br / posting_lists_[no].size();
+        auto cq = (float)score_coarse.second / posting_dist_lists_[no].back();
+        auto cd = (float)score_coarse.second / min_cluster_dist;
+
+        int direction_code = 0;
+        get_direction_code(query, no, direction_code);
+
+        auto cradius = 0;
+        if (cl <= cr) {
+            cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
+        }
+        if (cl <= cr) {
+            std::cerr << std::bitset<8>(direction_code) << ' ';
+            std::cerr << std::fixed << std::setprecision(2) 
+                    << cl << ' ' << cr << ' ' << cq << ' ' << cd 
+                    << ' ' << cradius << ' ' << hit_count;
+            if (cr <= cq) {
+                std::cerr << " <=====";
+            } else if (cq <= cl) {
+                std::cerr << " =====>";
+            }
+            std::cerr << std::endl;
+        }
+
         coarse_cnt++;
     }
     searched_cnt = scores.size();
@@ -571,7 +628,6 @@ IndexIVFPQ::query_obs(const std::vector<float>& query,
     return;
 }
 
-// std::pair<std::vector<size_t>, std::vector<float> > 
 void
 IndexIVFPQ::query_exhausted(const std::vector<float>& query,
                                             const std::vector<int>& gt,
@@ -637,6 +693,10 @@ IndexIVFPQ::query_exhausted(const std::vector<float>& query,
             cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
         }
 
+        int direction_code = 0;
+        get_direction_code(query, no, direction_code);
+        this->direction_[id * kc + coarse_cnt] = direction_code;
+
         coarse_cnt++;
     }
     searched_cnt = scores.size();
@@ -681,31 +741,13 @@ IndexIVFPQ::write_trainset(std::string dataset_name, int type)
     write_to_file_binary(queryraw_, {nq, D_}, dataset_name + prefix + "query" + f_suffix);
 
     write_to_file_binary(radius_, {nq, kc}, dataset_name + prefix + "radius" + i_suffix);
+    write_to_file_binary(direction_, {nq, kc}, dataset_name + prefix + "direction" + i_suffix);
 }
 
 void 
 IndexIVFPQ::show_statistics()
 {
-    std::vector<std::vector<std::pair<int, int>>> delta(kc, std::vector<std::pair<int, int>>(D_));
-    for (size_t no = 0; no < kc; ++no) {
-        for (size_t d = 0; d < D_; ++d) {
-            // std::cerr << direction_cnt[no][d].first << ' ' << direction_cnt[no][d].second << ' ';
-            // std::cerr << std::abs(direction_cnt[no][d].first - direction_cnt[no][d].second) << std::endl;
-            delta[no][d].first = d;
-            delta[no][d].second = 
-                std::abs(direction_cnt[no][d].first - direction_cnt[no][d].second);
-        }
-        std::sort(delta[no].begin(), delta[no].end(), 
-            [](const auto& a, const auto& b) {
-                return a.second < b.second;
-        });
-        std::cerr << "Cluster no: " << no << ' ';
-        for (size_t d = 0; d < 8; ++d) {
-            std::cerr << delta[no][d].second << "|" << delta[no][d].first << ' ';
-        }
-        std::cerr << "... ";
-        std::cerr << delta[no][D_ - 2].second << ' ' << delta[no][D_ - 1].second << std::endl;
-    }
+
 }
 
 
@@ -748,16 +790,19 @@ IndexIVFPQ::ADist(const DistanceTable& dtable, size_t list_no, size_t offset) co
     return dist;
 }
 
-std::pair<std::vector<size_t>, std::vector<float> > 
-IndexIVFPQ::PairVectorToVectorPair(const std::vector<std::pair<size_t, float> >& pair_vec) const
+void 
+IndexIVFPQ::get_direction_code(const std::vector<float>& vec, int id, int& direction_code)
 {
-    std::pair<std::vector<size_t>, std::vector<float>> vec_pair(std::vector<size_t>(pair_vec.size()), std::vector<float>(pair_vec.size()));
-    for(size_t n = 0, N = pair_vec.size(); n < N; ++n) {
-        vec_pair.first[n] = pair_vec[n].first;
-        vec_pair.second[n] = pair_vec[n].second;
+    const auto& center = centers_cq_[id];
+    int cur_bit = 0;
+    direction_code = 0;
+    for (size_t i = id * direction_code_bit; i < (id + 1) * direction_code_bit; ++i) {
+        const auto& dim = direction4cluster[i];
+        direction_code |= ((size_t)(vec[dim] - center[dim] > 0) << cur_bit);
+        cur_bit ++;
     }
-    return vec_pair;
 }
+
 
 std::vector<uint8_t> 
 IndexIVFPQ::get_single_code(size_t list_no, size_t offset) const

@@ -11,6 +11,8 @@
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t nq = 2'000;
+size_t segs = 20;
 int ncentroids = 1;
 int nprobe = ncentroids;
 
@@ -23,30 +25,33 @@ int main() {
     Toy::IVFConfig cfg(nb, D, nprobe, nb, 
                     ncentroids,
                     1, 
-                    D);
-    Toy::IndexIVF index(cfg, true, false);
+                    D, segs);
+    Toy::IndexIVF index(cfg, nq, true, false);
     index.train(database, 123, true);
     index.populate(database);
 
     puts("Index find kNN!");
     // Recall@k
     int k = 100;
-    int nq = 1000'000;
-    std::vector<int> nnid(nq * k);
-    std::vector<float>  dist(nq * k);
+    std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
+    std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
 #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        const auto& [id, d] = index.query(
+        size_t searched_cnt;
+        index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(), k, nb);
+            nnid[q], dist[q], searched_cnt, 
+            k, nb, q);
+        total_searched_cnt += searched_cnt;
         
-        size_t start_pos = q * k;
-        for (size_t i = 0; i < k; ++i) {
-            nnid[start_pos + i] = id[i];
-            dist[start_pos + i] = d[i];
-        }
+        // size_t start_pos = q * k;
+        // for (size_t i = 0; i < k; ++i) {
+        //     nnid[start_pos + i] = id[i];
+        //     dist[start_pos + i] = d[i];
+        // }
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";

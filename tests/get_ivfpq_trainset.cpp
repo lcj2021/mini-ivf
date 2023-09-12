@@ -11,8 +11,8 @@
 size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 64;
-size_t nq = 10'000;
+size_t mp = 128;
+size_t nq = 100'000;
 size_t segs = 20;
 int ncentroids = 100;
 int nprobe = ncentroids;
@@ -34,7 +34,11 @@ int main() {
                     1, mp, 
                     D, D / mp, segs);
     Toy::IndexIVFPQ index(cfg, nq, true, true);
-    index.train(database, 123, true);
+    std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
+                    + "_kc" + std::to_string(ncentroids);
+    // index.train(database, 123, true);
+    // index.write(index_path);
+    index.load(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -47,9 +51,6 @@ int main() {
     timer_query.start();
 #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        // tie(nnid[q], dist[q]) = index.query_exhausted(
-        //     std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-        //     std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb, q);
         size_t searched_cnt;
         index.query_exhausted(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
@@ -61,7 +62,7 @@ int main() {
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.write_trainset("/RF/dataset/sift/sift1m_pq64_10k_kc100_seg20", 0);
+    index.write_trainset("/RF/dataset/sift/sift1m_pq128_10k_kc100_seg20", 0);
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

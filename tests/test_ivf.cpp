@@ -14,15 +14,15 @@ size_t nb = 100'000;       // size of the database we plan to index
 size_t nt = 15'000;         // make a set of nt training vectors in the unit cube (could be the database)
 // size_t nb = 10'000;       // size of the database we plan to index
 // size_t nt = 1'000;         // make a set of nt training vectors in the unit cube (could be the database)
-int nq = 2'000;               // size of the queries we plan to search
+size_t nq = 2'000;
+size_t segs = 20;
 int ncentroids = 25;
 int nprobe = 25;
-size_t mp = 32;
 
 Toy::IVFConfig cfg(nb, D, nprobe, nb / 50, 
                     ncentroids, 
                     1,
-                    D);
+                    D, segs);
 
 int main() {
     std::mt19937 rng;
@@ -47,16 +47,16 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVF index(cfg, true, false);
+    Toy::IndexIVF index(cfg, nq, true, false);
     index.train(database_flat, 123, false);
     index.populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
 
     // searching the database
-    std::vector<std::vector<float>> queries(nq, std::vector<float>(D));
+    std::vector<float> query(nq * D);
     for (size_t i = 0; i < nq; ++i) {
         for (size_t j = 0; j < D; ++j) {
-            queries[i][j] = distrib(rng);
+            query[i * D + j] = distrib(rng);
         }
     }
 
@@ -66,7 +66,7 @@ int main() {
         size_t cand_id = -1;
         float cand_dist = std::numeric_limits<float>::max();
         for (int j = 0; j < nb; ++j) {
-            float dist = fvec_L2sqr(queries[i].data(), database[j].data(), D);
+            float dist = fvec_L2sqr(query.data() + i * D, database[j].data(), D);
             if (cand_dist > dist) {
                 cand_dist = dist;
                 cand_id = j;
@@ -83,11 +83,17 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
-    for (size_t i = 0; i < nq; ++i) {
-        tie(nnid[i], dist[i]) = index.query(queries[i], std::vector<int>{}, k, nb);
+#pragma omp parallel for
+    for (size_t q = 0; q < nq; ++q) {
+        size_t searched_cnt;
+        index.query_baseline(
+            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+            nnid[q], dist[q], searched_cnt, 
+            k, nb, q);
+        total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";

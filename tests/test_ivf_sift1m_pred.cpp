@@ -4,20 +4,21 @@
 #include <unordered_set>
 
 #include "binary_io.h"
-#include "index_ivfpq.h"
+#include "index_ivf.h"
 #include "quantizer.h"
 #include "util.h"
 
-size_t D;              // dimension of the vectors to index
+size_t D, d_pred;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t n_pred;
 size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
 int ncentroids = 100;
 
 int main(int argc, char* argv[]) {
-    assert(argc == 2);
+    assert(argc == 4);
     std::vector<float> database;
     std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
@@ -29,18 +30,26 @@ int main(int argc, char* argv[]) {
     // load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
     load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
-    int nprobe = std::atoi(argv[1]);
+    std::vector<int> pred_radius;
+    // "/RF/dataset/sift/sift1m_pq128_100k_kc100_seg20/pred.ivecs"
+    std::string pred_path = std::string(argv[3]);
+    std::tie(n_pred, d_pred) = load_from_file_binary(pred_radius, 
+                pred_path);
+    
+    int cut = std::atoi(argv[1]);
+    int nprobe = std::atoi(argv[2]);
 
-    Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
-                    ncentroids, 256, 
-                    1, mp, 
-                    D, D / mp, segs);
-    Toy::IndexIVFPQ index(cfg, nq, true, false);
+    assert(d_pred == ncentroids);
+
+    Toy::IVFConfig cfg(nb, D, nprobe, nb, 
+                    ncentroids, 
+                    1,  
+                    D, segs);
+    Toy::IndexIVF index(cfg, nq, true, false);
+    index.train(database, 123, true);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                         + "_kc" + std::to_string(ncentroids);
-    // index.train(database, 123, true);
-    // index.write(index_path);
-    index.load(index_path);
+                        
     index.populate(database);
 
     puts("Index find kNN!");
@@ -54,10 +63,11 @@ int main(int argc, char* argv[]) {
 // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        index.query_baseline(
-            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+        index.query_pred(
+            std::vector<float>(query.data() + q * D, query.data() + (q + 1) * D), 
+            std::vector<int>(pred_radius.data() + q * d_pred, pred_radius.data() + q * d_pred + k), 
             nnid[q], dist[q], searched_cnt, 
-             k, nb, q);
+            cut, k, nb, q);
         total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
@@ -70,8 +80,11 @@ int main(int argc, char* argv[]) {
             if (S.count(nnid[q][i]))
                 n_ok++;
     }
-    std::cout << (double)n_ok / (nq * k) << '\n';
+    std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
     std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
+    printf("IVF, segs%lu, kc%d, W%d\n", segs, ncentroids, nprobe);
+    printf("cut%d\n", cut);
+    std::cout << "pred_path: " << pred_path << '\n';
 
     return 0;
 }

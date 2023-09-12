@@ -3,7 +3,7 @@
 #include <numeric>
 #include <unordered_set>
 
-#include "hdf5_io.h"
+#include "binary_io.h"
 #include "index_ivf.h"
 #include "quantizer.h"
 #include "util.h"
@@ -11,47 +11,49 @@
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
-int ncentroids = 1;
+size_t nq = 2'000;
+size_t segs = 20;
+int ncentroids = 100;
 int nprobe = ncentroids;
 
-int main() {
-    // dimension of the vectors to index
-    // size of the database we plan to index
-    // make a set of nt training vectors in the unit cube (could be the database)
-    // size of the queries we plan to search
-
+int main(int argc, char* argv[]) {
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_hdf5(database, "../../dataset/sift-128-euclidean.hdf5", "train");
+    std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
+    // auto& query = database;
     std::vector<float> query;
-    auto [nq, _] = load_from_file_hdf5(query, "../../dataset/sift-128-euclidean.hdf5", "test");
+    load_from_file_binary(query, "/RF/dataset/sift/sift_query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_hdf5(gt, "../../dataset/sift-128-euclidean.hdf5", "neighbors");
+    // load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
+    load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
-    // std::vector<float> gt_d;
-    // load_from_file_hdf5(gt_d, "../../dataset/sift-128-euclidean.hdf5", "distances");
+    int nprobe = std::atoi(argv[1]);
 
     Toy::IVFConfig cfg(nb, D, nprobe, nb, 
                     ncentroids,
                     1,
-                    D);
-    Toy::IndexIVF index(cfg, true, false);
+                    D, segs);
+    Toy::IndexIVF index(cfg, nq, true, false);
     index.train(database, 123, true);
     index.populate(database);
 
     puts("Index find kNN!");
     // Recall@k
     int k = 100;
-    nq = 10'000;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
+// #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
-        tie(nnid[q], dist[q]) = index.query(
+        size_t searched_cnt;
+        index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), k, nb);
+            nnid[q], dist[q], searched_cnt, 
+             k, nb, q);
+        total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
@@ -64,6 +66,7 @@ int main() {
                 n_ok++;
     }
     std::cout << (double)n_ok / (nq * k) << '\n';
+    std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
 
     return 0;
 }
