@@ -12,22 +12,22 @@ size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
-size_t nq = 100'000;
+size_t nq = 10'000;
 size_t segs = 20;
-int ncentroids = 100;
+int ncentroids = 400;
 int nprobe = ncentroids;
 
 int main() {
     std::vector<float> database;
     std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
 
-    const auto& query = database;
-    // std::vector<float> query;
-    // load_from_file_binary(query, "/RF/dataset/sift/sift_query.fvecs");
+    // const auto& query = database;
+    std::vector<float> query;
+    load_from_file_binary(query, "/RF/dataset/sift/sift_query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
-    // load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
+    // load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
+    load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
 
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
@@ -36,8 +36,8 @@ int main() {
     Toy::IndexIVFPQ index(cfg, nq, true, true);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                     + "_kc" + std::to_string(ncentroids);
-    // index.train(database, 123, true);
-    // index.write(index_path);
+    index.train(database, 123, true);
+    index.write(index_path);
     index.load(index_path);
     index.populate(database);
 
@@ -62,7 +62,7 @@ int main() {
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.write_trainset("/RF/dataset/sift/sift1m_pq128_10k_kc100_seg20", 0);
+    index.write_trainset("/RF/dataset/sift/sift1m_pq128_10k_kc400_seg20", 1);
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

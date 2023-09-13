@@ -14,7 +14,7 @@ size_t nt;         // make a set of nt training vectors in the unit cube (could 
 size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
-int ncentroids = 100;
+int ncentroids = 1000;
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
@@ -70,8 +70,9 @@ int main(int argc, char* argv[]) {
             if (S.count(nnid[q][i]))
                 n_ok++;
     }
-    std::cout << (double)n_ok / (nq * k) << '\n';
+    std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
     std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
+    printf("PQ%lu, segs%lu, kc%d, W%d\n", mp, segs, ncentroids, nprobe);
 
     return 0;
 }
