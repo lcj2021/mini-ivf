@@ -36,8 +36,8 @@ int main() {
     Toy::IndexIVFPQ index(cfg, nq, true, true);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                         + "_kc" + std::to_string(ncentroids);
-    index.train(database, 123, true);
-    index.write(index_path);
+    // index.train(database, 123, true);
+    // index.write(index_path);
     index.load(index_path);
     index.populate(database);
 
@@ -46,20 +46,18 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    size_t total_searched_cnt = 0, total_miss_cnt = 0;
+    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
 // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        size_t miss_cnt;
         index.query_obs(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
-            nnid[q], dist[q], searched_cnt, miss_cnt, 
+            nnid[q], dist[q], searched_cnt, 
              k, nb, q);
         total_searched_cnt += searched_cnt;
-        total_miss_cnt += miss_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
@@ -72,7 +70,6 @@ int main() {
                 n_ok++;
     }
     std::cout << (double)n_ok / (nq * k) << '\n';
-    std::cout << "miss rate: " << (double)total_miss_cnt / (nq * k) << '\n';
 
     index.show_statistics();
 

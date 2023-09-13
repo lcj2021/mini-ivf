@@ -14,7 +14,7 @@ size_t nt;         // make a set of nt training vectors in the unit cube (could 
 size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
-int ncentroids = 1000;
+int ncentroids = 400;
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);

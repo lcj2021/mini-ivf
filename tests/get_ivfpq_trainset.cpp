@@ -36,8 +36,8 @@ int main() {
     Toy::IndexIVFPQ index(cfg, nq, true, true);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                     + "_kc" + std::to_string(ncentroids);
-    index.train(database, 123, true);
-    index.write(index_path);
+    // index.train(database, 123, true);
+    // index.write(index_path);
     index.load(index_path);
     index.populate(database);
 
@@ -62,7 +62,7 @@ int main() {
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.write_trainset("/RF/dataset/sift/sift1m_pq128_10k_kc400_seg20", 1);
+    index.write_trainset("/RF/dataset/sift/sift1m_pq128_10k_kc400_seg20_01", 0);
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {
