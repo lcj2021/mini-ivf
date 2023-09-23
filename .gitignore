@@ -1,6 +1,7 @@
 release/
 build/
 .git/
+__pycache__/
 
 # Prerequisites
 *.d

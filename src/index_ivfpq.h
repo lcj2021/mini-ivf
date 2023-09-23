@@ -11,6 +11,7 @@
 #include <fstream>
 #include "util.h"
 #include "quantizer.h"
+#include "kmeans.h"
 #include "binary_io.h"
 #include "distance.h"
 #include <omp.h>
@@ -85,6 +86,29 @@ public:
                 int L,
                 int id);
 
+    // IVFPQ RF with voting
+    void
+    query_pred_vote(const std::vector<float>& query,
+                const std::vector<int>& pred_radius,
+                std::vector<size_t>& nnid,
+                std::vector<float>& dist,
+                size_t& searched_cnt,
+                int cut,
+                int topk,
+                int L,
+                int id);
+
+    // IVFPQ 01 pred
+    void
+    query_pred_01(const std::vector<float>& query,
+                const std::vector<int>& pred_radius,
+                std::vector<size_t>& nnid,
+                std::vector<float>& dist,
+                size_t& searched_cnt,
+                int topk,
+                int L,
+                int id);
+
     // For observation
     void
     query_obs(const std::vector<float>& query,
@@ -99,6 +123,17 @@ public:
     // Write train set
     void
     query_exhausted(const std::vector<float>& query,
+                const std::vector<int>& gt,
+                std::vector<size_t>& nnid,
+                std::vector<float>& dist,
+                size_t& searched_cnt,
+                int topk,
+                int L,
+                int id);
+
+    // Write train set
+    void
+    query_exhausted_sample(const std::vector<float>& query,
                 const std::vector<int>& gt,
                 std::vector<size_t>& nnid,
                 std::vector<float>& dist,
@@ -140,8 +175,14 @@ public:
     std::vector<std::vector<int>> posting_lists_;  // (NumList, any)
     std::vector<std::vector<float>> posting_dist_lists_;  // (NumList, any)
 
+    size_t pivot_cnt = 5'00;
+    std::vector<std::vector<size_t>> start4segs;
+    // std::vector<std::vector<std::vector<size_t>>> pivots_in_segs_;  
+    std::vector<std::vector<std::vector<std::vector<float>>>> pivots_in_segs_;  
+
     std::vector<float> L, R, Q, distance_, queryraw_;
     std::vector<int> radius_;
+    std::vector<int> sample_;
 };
 
 
@@ -162,6 +203,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose, bool wri
         Q.resize(nq * kc);
         distance_.resize(nq * kc);
         radius_.resize(nq * kc);
+        sample_.resize(nq * kc);
 
         queryraw_.resize(nq * D_);
     }
@@ -224,15 +266,15 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
 {
     const auto& pqcodes = pq_->encode(rawdata);
 
-// #pragma omp parallel for
+#pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
         const auto& vec = nth_raw_vector(rawdata, n);
         int id = cq_->predict_one(vec, 0);
-        // #pragma omp critical
-        // {
+        #pragma omp critical
+        {
             posting_lists_[id].emplace_back(n);
             posting_dist_lists_[id].emplace_back(0);
-        // }
+        }
     }
 
 // #pragma omp parallel for
@@ -279,6 +321,26 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
             const auto& nth_code = pqcodes[id];
             db_codes_[no].insert(db_codes_[no].end(), nth_code.begin(), nth_code.end());
         }
+
+        // size_t posting_lists_len = plist.size(), step = (posting_lists_len + segs - 1) / segs;
+        // for (size_t i = 0; i < posting_lists_len; i += step) {
+        //     start4segs[no].emplace_back(i);
+        // } 
+
+        // for (size_t i = 0; i < segs; ++i) {
+        //     size_t st = start4segs[no][i];
+        //     size_t ed = (i + 1 < segs) ? start4segs[no][i + 1] : posting_lists_len;
+
+        //     std::vector<std::vector<float>> obs;
+        //     for (size_t i = st; i < ed; ++i) {
+        //         obs.emplace_back(nth_raw_vector(rawdata, plist[i]));
+        //     }
+
+        //     auto [centroid, id] = KMeans(obs, pivot_cnt, 24, "points");
+
+        //     assert(centroid.size() == pivot_cnt);
+        //     pivots_in_segs_[no][i] = centroid;
+        // }
     }
 }
 
@@ -299,6 +361,16 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
     db_codes_.resize(kc);
     posting_dist_lists_.clear();
     posting_dist_lists_.resize(kc);
+
+    start4segs.resize(kc);
+
+    // pivots_in_segs_.resize(kc, 
+    //         std::vector<std::vector<size_t>>(segs, 
+    //         std::vector<size_t>(pivot_cnt)));
+
+    pivots_in_segs_.resize(kc, 
+            std::vector<std::vector<std::vector<float>>>(segs, 
+            std::vector<std::vector<float>>()));
 
     for (auto& posting_list : posting_lists_) {
         posting_list.reserve(N_ / kc);  // Roughly malloc
@@ -426,6 +498,7 @@ IndexIVFPQ::query_pred(const std::vector<float>& query,
     std::vector<std::pair<size_t, float>> scores;
     scores.reserve(L);
     int coarse_cnt = 0;
+    // printf("===== Query %d =====\n", id);
     for (const auto& score_coarse : scores_coarse) {
         size_t no = score_coarse.first;
         size_t posting_lists_len = posting_lists_[no].size();
@@ -434,6 +507,7 @@ IndexIVFPQ::query_pred(const std::vector<float>& query,
         if (1 <= radius && radius < cut) {
             radius = cut;
         }
+
         auto cq = (float)score_coarse.second / posting_dist_lists_[no].back();
         // printf("===== Cluster %lu =====\n", no);
         // std::cerr << "radius: " << radius << std::endl;
@@ -453,6 +527,183 @@ IndexIVFPQ::query_pred(const std::vector<float>& query,
             goto end_of_current_cluster;
         }
         for (size_t idx = bl; idx < br; ++idx) {
+            const auto& n = posting_lists_[no][idx];
+            scores.emplace_back(n, ADist(dtable, no, idx));
+        }
+
+end_of_current_cluster: 
+        coarse_cnt++;
+        if (coarse_cnt == W_) {
+            searched_cnt = scores.size();
+            topk = std::min(topk, (int)searched_cnt);
+            std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                    return a.second < b.second;
+            });
+            scores.resize(topk);
+            scores.shrink_to_fit();
+            for (size_t i = 0; i < scores.size(); ++i) {
+                const auto& [id, d] = scores[i];
+                nnid[i] = id;
+                dist[i] = d;
+            }
+            return;
+        }
+    }
+}
+
+void
+IndexIVFPQ::query_pred_vote(const std::vector<float>& query,
+                                            const std::vector<int>& pred_radius,
+                                            std::vector<size_t>& nnid,
+                                            std::vector<float>& dist,
+                                            size_t& searched_cnt,
+                                            int cut,
+                                            int topk,
+                                            int L,
+                                            int id)
+{
+    DistanceTable dtable = DTable(query);
+
+    std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
+    for (size_t no = 0; no < kc; ++no) {
+        scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
+    }
+
+    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W_, scores_coarse.end(),
+                    [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+
+    std::vector<std::pair<size_t, float>> scores;
+    scores.reserve(L);
+    int coarse_cnt = 0;
+    // printf("===== Query %d =====\n", id);
+    for (const auto& score_coarse : scores_coarse) {
+        size_t no = score_coarse.first;
+        size_t posting_lists_len = posting_lists_[no].size();
+
+        int radius = pred_radius[no];
+        if (radius == 0) {
+            goto end_of_current_cluster;
+        } else {
+            if (radius < cut) {
+                radius = cut;
+            }
+            // radius *= 2;
+            radius = std::min(radius, (int)segs);
+            assert(radius <= segs);
+            std::vector<std::pair<size_t, float>> scores_segs(segs);
+            for (size_t seg = 0; seg < segs; ++seg) {
+                float min_dist = std::numeric_limits<float>::max();
+                // for (const auto& pv : pivots_in_segs_[no][seg]) {
+                //     min_dist = std::min(min_dist, ADist(dtable, no, pv));
+                // }
+                float avg_dist = 0.;
+                for (const auto& pv : pivots_in_segs_[no][seg]) {
+                    float dist = fvec_L2sqr_ref(query.data(), pv.data(), D_);
+                    min_dist = std::min(min_dist, dist);
+                    // avg_dist += dist;
+                }
+                // avg_dist /= pivots_in_segs_[no][seg].size();
+                scores_segs[seg] = {seg, min_dist};
+            }
+            std::partial_sort(scores_segs.begin(), scores_segs.begin() + radius, scores_segs.end(),
+                        [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+
+            auto cq = (float)score_coarse.second / posting_dist_lists_[no].back();
+            // printf("===== Cluster %lu =====\n", no);
+            // std::cerr << "radius: " << radius << std::endl;
+            // std::cerr << "cq: " << cq << std::endl;
+            float radius_f = (float)radius / segs;
+            float bl_f = cq - radius_f;
+            float br_f = cq + radius_f;
+            bl_f -= (float)3.5 / segs;
+            br_f -= (float)3.5 / segs;
+            bl_f = std::min(1.0f, bl_f);
+            bl_f = std::max(0.0f, bl_f);
+            br_f = std::min(1.0f, br_f);
+            br_f = std::max(0.0f, br_f);
+            size_t bl = bl_f * posting_lists_len;
+            size_t br = br_f * posting_lists_len;
+            
+            // std::cerr << "cluster: " << no << ", " << "radius: " << radius << '\n';
+            // std::cerr << (size_t)(bl_f * segs) << ' ' << (size_t)(br_f * segs) << '\n';
+            // std::cerr << segs * pivot_cnt << " / " << posting_lists_len <<'\n';
+            // for (size_t i = 0; i < segs; ++i) {
+            //     std::cerr << i << ' ' << scores_segs[i].first << "|" << scores_segs[i].second << '\n';
+            // }
+
+            scores_segs.resize(radius);
+            for (const auto [seg, dist] : scores_segs) {
+                size_t st = start4segs[no][seg];
+                size_t ed = (seg + 1 < segs) ? start4segs[no][seg + 1] : posting_lists_len;
+                for (size_t idx = st; idx < ed; ++idx) {
+                    const auto& n = posting_lists_[no][idx];
+                    scores.emplace_back(n, ADist(dtable, no, idx));
+                }
+            }
+
+            // for (size_t idx = bl; idx < br; ++idx) {
+            //     const auto& n = posting_lists_[no][idx];
+            //     scores.emplace_back(n, ADist(dtable, no, idx));
+            // }
+        }
+        
+
+end_of_current_cluster: 
+        coarse_cnt++;
+        if (coarse_cnt == W_) {
+            searched_cnt = scores.size();
+            topk = std::min(topk, (int)searched_cnt);
+            std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                    return a.second < b.second;
+            });
+            scores.resize(topk);
+            scores.shrink_to_fit();
+            for (size_t i = 0; i < scores.size(); ++i) {
+                const auto& [id, d] = scores[i];
+                nnid[i] = id;
+                dist[i] = d;
+            }
+            return;
+        }
+    }
+}
+
+void
+IndexIVFPQ::query_pred_01(const std::vector<float>& query,
+                                            const std::vector<int>& pred_radius,
+                                            std::vector<size_t>& nnid,
+                                            std::vector<float>& dist,
+                                            size_t& searched_cnt,
+                                            int topk,
+                                            int L,
+                                            int id)
+{
+    DistanceTable dtable = DTable(query);
+
+    std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
+    for (size_t no = 0; no < kc; ++no) {
+        scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
+    }
+
+    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W_, scores_coarse.end(),
+                    [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+
+    std::vector<std::pair<size_t, float>> scores;
+    scores.reserve(L);
+    int coarse_cnt = 0;
+    printf("===== Query %d =====\n", id);
+    for (const auto& score_coarse : scores_coarse) {
+        size_t no = score_coarse.first;
+        size_t posting_lists_len = posting_lists_[no].size();
+
+        int radius = pred_radius[no];
+        std::cerr << radius << " \n"[coarse_cnt == kc - 1];
+        if (radius == 0) {
+            goto end_of_current_cluster;
+        }
+        for (size_t idx = 0; idx < posting_lists_len; ++idx) {
             const auto& n = posting_lists_[no][idx];
             scores.emplace_back(n, ADist(dtable, no, idx));
         }
@@ -619,9 +870,98 @@ IndexIVFPQ::query_exhausted(const std::vector<float>& query,
         cd = (float)score_coarse.second / min_cluster_dist;
 
         cradius = 0;
-        if (cl <= cr) {
-            // cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
-            cradius = 1;
+        if (bl <= br) {
+            cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
+            // cradius = 1;
+        }
+
+        coarse_cnt++;
+    }
+    searched_cnt = scores.size();
+    topk = std::min(topk, (int)searched_cnt);
+    std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
+                    [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
+                        return a.second < b.second;
+                    });
+    scores.resize(topk);
+    scores.shrink_to_fit();
+    for (size_t i = 0; i < scores.size(); ++i) {
+        const auto& [id, d] = scores[i];
+        nnid[i] = id;
+        dist[i] = d;
+    }
+    return;
+}
+
+void
+IndexIVFPQ::query_exhausted_sample(const std::vector<float>& query,
+                                            const std::vector<int>& gt,
+                                            std::vector<size_t>& nnid,
+                                            std::vector<float>& dist,
+                                            size_t& searched_cnt,
+                                            int topk,
+                                            int L,
+                                            int id)
+{
+    if (!write_trainset_) {
+        std::cerr << "write_trainset_ not set!" << std::endl;
+        throw;
+    }
+
+    DistanceTable dtable = DTable(query);
+
+    std::vector<std::pair<size_t, float>> scores_coarse(centers_cq_.size());
+    for (size_t no = 0; no < kc; ++no) {
+        scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
+    }
+
+    W_ = kc / 2;
+    std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W_, scores_coarse.end(),
+                [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b){return a.second < b.second;});
+
+    std::unordered_set<int> gt_set;
+    gt_set = std::unordered_set<int>(gt.begin(), gt.end());
+    assert(query.size() == D_);
+    for (size_t d = 0; d < D_; ++d) {
+        queryraw_[id * D_ + d] = query[d];
+    }
+
+    std::vector<std::pair<size_t, float>> scores;
+    scores.reserve(L);
+    int coarse_cnt = 0;
+    for (const auto& score_coarse : scores_coarse) {
+        size_t no = score_coarse.first;
+        size_t bl = posting_lists_[no].size(), br = 0;
+        size_t hit_count = 0, posting_lists_len = posting_lists_[no].size();
+
+        for (size_t idx = 0; idx < posting_lists_len; ++idx) {
+            const auto& n = posting_lists_[no][idx];
+            if (gt_set.count(n)) {
+                bl = std::min(bl, idx);
+                br = std::max(br, idx);
+                hit_count ++;
+            }
+            scores.emplace_back(n, ADist(dtable, no, idx));
+        }
+
+        auto&& cl = this->L[id * kc + no];
+        auto&& cr = this->R[id * kc + no];
+        auto&& cq = this->Q[id * kc + no];
+        auto&& cd = this->distance_[id * kc + no];
+        auto&& cradius = this->radius_[id * kc + no];
+
+        cl = (float)bl / posting_lists_[no].size();
+        cr = (float)br / posting_lists_[no].size();
+        cq = (float)score_coarse.second / posting_dist_lists_[no].back();
+        cd = score_coarse.second;
+
+        cradius = 0;
+        if (bl <= br) {
+            cradius = (int)ceil((float)segs * (cr - cl) + 1e-6);
+            // cradius = 1;
+        }
+        if (coarse_cnt < W_) {
+            sample_[id * kc + no] = 1;
         }
 
         coarse_cnt++;
@@ -664,10 +1004,11 @@ IndexIVFPQ::write_trainset(std::string dataset_name, int type)
     // write_to_file_binary(L, {nq, kc}, dataset_name + prefix + "l" + f_suffix);
     // write_to_file_binary(R, {nq, kc}, dataset_name + prefix + "r" + f_suffix);
     write_to_file_binary(distance_, {nq, kc}, dataset_name + prefix + "distance" + f_suffix);
-    write_to_file_binary(Q, {nq, kc}, dataset_name + prefix + "q" + f_suffix);
+    // write_to_file_binary(Q, {nq, kc}, dataset_name + prefix + "q" + f_suffix);
     write_to_file_binary(queryraw_, {nq, D_}, dataset_name + prefix + "query" + f_suffix);
 
     write_to_file_binary(radius_, {nq, kc}, dataset_name + prefix + "radius" + i_suffix);
+    write_to_file_binary(sample_, {nq, kc}, dataset_name + prefix + "sample" + i_suffix);
 }
 
 void 

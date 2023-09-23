@@ -15,7 +15,7 @@ size_t n_pred;
 size_t mp = 128;
 size_t nq = 2'000;
 size_t segs = 20;
-int ncentroids = 100;
+int ncentroids = 1000;
 
 int main(int argc, char* argv[]) {
     assert(argc == 4);

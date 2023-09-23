@@ -11,7 +11,7 @@
 size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 128;
+size_t mp = 4;
 size_t nq = 1'0;
 size_t segs = 20;
 int ncentroids = 100;
