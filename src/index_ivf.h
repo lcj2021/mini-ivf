@@ -7,7 +7,6 @@
 #include <cassert>
 #include <unordered_set>
 #include <fstream>
-#include "pqkmeans.h"
 #include "util.h"
 #include "quantizer.h"
 #include "distance.h"

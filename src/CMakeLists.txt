@@ -10,9 +10,7 @@ add_library(toy SHARED
     hdf5_io.h
     index_ivf.h
     index_ivfpq.h
-    index_rii.h
     kmeans.h
-    pqkmeans.cpp
     quantizer.cpp
     util.h
 )
