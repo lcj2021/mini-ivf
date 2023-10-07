@@ -137,11 +137,13 @@ Quantizer::encode(const std::vector<std::vector<float>>& rawdata)
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
         std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));
-#pragma omp parallel for
+
+        #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
             std::copy_n(rawdata[i].begin() + m * Ds_, Ds_, vecs_sub[i].begin());
         }
-#pragma omp parallel for
+
+        #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
             auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
@@ -162,11 +164,13 @@ Quantizer::encode(const std::vector<float>& rawdata)
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
         std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));
-#pragma omp parallel for
+
+        #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
             std::copy_n(rawdata.begin() + i * D_ + m * Ds_, Ds_, vecs_sub[i].begin());
         }
-#pragma omp parallel for
+        
+        #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
             auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;

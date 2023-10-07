@@ -13,7 +13,6 @@ size_t nb;       // size of the database we plan to index
 size_t nt;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 2'000;
-size_t segs = 20;
 int ncentroids = 1'000;
 
 int main(int argc, char* argv[]) {
@@ -34,14 +33,21 @@ int main(int argc, char* argv[]) {
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
                     1, mp, 
-                    D, D / mp, segs);
+                    D, D / mp);
     Toy::IndexIVFPQ index(cfg, nq, true, false);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                         + "_kc" + std::to_string(ncentroids);
-    index.train(database, 123, true);
-    index.write(index_path);
+    // index.train(database, 123, true);
+    // index.write(index_path);
     index.load(index_path);
     index.populate(database);
+
+    // std::vector<int> posting_lists_size(ncentroids);
+    // for (size_t i = 0; i < ncentroids; i++) {
+    //     posting_lists_size[i] = index.posting_lists_[i].size();
+    // }
+    // write_to_file_binary(posting_lists_size, {ncentroids, 1}, 
+    //     "../../dataset/sift/sift1m_pq128_10k_kc1000_seg20_sample/posting_lists_size.ivecs");
 
     puts("Index find kNN!");
     // Recall@k
@@ -51,7 +57,8 @@ int main(int argc, char* argv[]) {
     size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
-// #pragma omp parallel for
+
+    // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.query_baseline(
@@ -72,7 +79,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
     std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
-    printf("PQ%lu, segs%lu, kc%d, W%d\n", mp, segs, ncentroids, nprobe);
+    printf("PQ%lu, kc%d, W%d\n", mp, ncentroids, nprobe);
 
     return 0;
 }

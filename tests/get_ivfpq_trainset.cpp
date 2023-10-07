@@ -13,7 +13,6 @@ size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 10'000;
-size_t segs = 20;
 int ncentroids = 100;
 int nprobe = ncentroids;
 
@@ -32,7 +31,7 @@ int main() {
     Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
                     ncentroids, 256, 
                     1, mp, 
-                    D, D / mp, segs);
+                    D, D / mp);
     Toy::IndexIVFPQ index(cfg, nq, true, true);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                     + "_kc" + std::to_string(ncentroids);
@@ -49,10 +48,11 @@ int main() {
     size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
-#pragma omp parallel for
+    
+    #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        index.query_exhausted_sample(
+        index.query_exhausted(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
             nnid[q], dist[q], searched_cnt, 

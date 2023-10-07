@@ -46,7 +46,8 @@ int main(int argc, char* argv[]) {
     size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
-// #pragma omp parallel for
+
+    // #pragma omp parallel for
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.query_baseline(

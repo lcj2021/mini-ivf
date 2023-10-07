@@ -17,7 +17,7 @@ namespace {
         std::vector<float> dists(centers.size());
         size_t K_ = centers.size(), Ds_ = centers[0].size();
 
-#pragma omp parallel for
+        #pragma omp parallel for
         for (size_t i = 0; i < K_; ++i) {
             dists[i] = fvec_L2sqr(query.data(), centers[i].data(), Ds_);
         }
@@ -63,7 +63,8 @@ namespace {
             // std::cout << iter_count << '\n';
             // Assign each observation to the nearest centroid
             double errors_sum = 0.0;
-        #pragma omp parallel for
+            
+            #pragma omp parallel for
             for (int i = 0; i < N; ++i) {
                 float min_dist;
                 std::tie(labels[i], min_dist) = nearest_center(obs[i], centroids);

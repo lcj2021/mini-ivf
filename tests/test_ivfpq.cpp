@@ -16,14 +16,13 @@ size_t nt = 15'000;         // make a set of nt training vectors in the unit cub
 // size_t nt = 1'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 32;
 size_t nq = 2'000;               // size of the query we plan to search
-size_t segs = 20;
 int ncentroids = 25;
 int nprobe = 10;
 
 Toy::IVFPQConfig cfg(nb, D, nprobe, nb / 50, 
                     ncentroids, 256, 
                     1, mp, 
-                    D, D / mp, segs);
+                    D, D / mp);
 
 int main() {
     std::mt19937 rng;

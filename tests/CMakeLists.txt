@@ -11,13 +11,9 @@ set(TEST_SOURCES
     test_ivfpq.cpp
     test_ivfpq_gist1m_baseline.cpp
     test_ivfpq_sift1m_baseline.cpp
-    test_ivfpq_sift1m_pred.cpp
-    test_ivfpq_sift1m_pred_vote.cpp
-    test_ivfpq_sift1m_pred_01.cpp
     test_ivfpq_gist1m_obs.cpp
     test_ivfpq_sift1m_obs.cpp
     test_ivf_sift1m_baseline.cpp
-    test_ivf_sift1m_pred.cpp
     get_ivfpq_trainset.cpp
     get_groundtruth.cpp)
 
