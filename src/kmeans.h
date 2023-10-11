@@ -17,7 +17,10 @@ namespace {
         std::vector<float> dists(centers.size());
         size_t K_ = centers.size(), Ds_ = centers[0].size();
 
-        #pragma omp parallel for
+        /**
+         * @bug NO OMP here!
+        */
+        // #pragma omp parallel for
         for (size_t i = 0; i < K_; ++i) {
             dists[i] = fvec_L2sqr(query.data(), centers[i].data(), Ds_);
         }

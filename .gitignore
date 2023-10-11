@@ -3,6 +3,7 @@ build/
 .git/
 __pycache__/
 
+*.txt
 *.jpg
 *.ipynb
 

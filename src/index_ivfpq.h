@@ -210,16 +210,10 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
     /**
      * @bug Lock needed
     */
-//    std::mutex mutex_;
-    #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
         const auto& vec = nth_raw_vector(rawdata, n);
         int id = cq_->predict_one(vec, 0);
-        #pragma omp critical
-        {
-            // std::unique_lock<std::mutex> lock(mutex_);
-            posting_lists_[id].emplace_back(n);
-        }
+        posting_lists_[id].emplace_back(n);
     }
 
     #pragma omp parallel for

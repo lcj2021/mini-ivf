@@ -60,6 +60,8 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
     // traindata_trim.resize(std::min((size_t)100'000, N_) * D_);
     size_t Nt = traindata_trim.size() / D_;
     std::vector<std::vector<float>> train_vecs(Nt, std::vector<float>(D_));
+
+    #pragma omp parallel for
     for (std::size_t n = 0; n < Nt; ++n) {
         std::copy(traindata_trim.begin() + n * D_, traindata_trim.begin() + (n + 1) * D_, 
                     train_vecs[n].begin());
@@ -71,6 +73,7 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
             std::cout << "Training the subspace: " << m << " / " << M_ << std::endl;
         }
         std::vector<std::vector<float>> vecs_sub(Nt, std::vector<float>(Ds_, 0.0));
+        #pragma omp parallel for
         for (int i = 0; i < Nt; ++i) {
             std::copy(train_vecs[i].begin() + m * Ds_, train_vecs[i].begin() + (m + 1) * Ds_, vecs_sub[i].begin());
         }

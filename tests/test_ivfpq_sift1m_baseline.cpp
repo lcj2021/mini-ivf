@@ -37,8 +37,8 @@ int main(int argc, char* argv[]) {
     Toy::IndexIVFPQ index(cfg, nq, true, false);
     std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                         + "_kc" + std::to_string(ncentroids);
-    // index.train(database, 123, true);
-    // index.write(index_path);
+    index.train(database, 123, true);
+    index.write(index_path);
     index.load(index_path);
     index.populate(database);
 
