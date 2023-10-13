@@ -207,13 +207,23 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
 {
     const auto& pqcodes = pq_->encode(rawdata);
 
-    /**
-     * @bug Lock needed
-    */
+    std::vector<omp_lock_t> locks(kc);
+
+    for (int i = 0; i < kc; ++i) {
+        omp_init_lock(&locks[i]);
+    }
+
+    #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
         const auto& vec = nth_raw_vector(rawdata, n);
         int id = cq_->predict_one(vec, 0);
+        omp_set_lock(&locks[id]);
         posting_lists_[id].emplace_back(n);
+        omp_unset_lock(&locks[id]);
+    }
+
+    for (int i = 0; i < kc; ++i) {
+        omp_destroy_lock(&locks[i]);
     }
 
     #pragma omp parallel for

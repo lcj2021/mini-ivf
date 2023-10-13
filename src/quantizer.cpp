@@ -75,7 +75,8 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
         std::vector<std::vector<float>> vecs_sub(Nt, std::vector<float>(Ds_, 0.0));
         #pragma omp parallel for
         for (int i = 0; i < Nt; ++i) {
-            std::copy(train_vecs[i].begin() + m * Ds_, train_vecs[i].begin() + (m + 1) * Ds_, vecs_sub[i].begin());
+            std::copy(train_vecs[i].begin() + m * Ds_, train_vecs[i].begin() + (m + 1) * Ds_, 
+                        vecs_sub[i].begin());
         }
         std::vector<std::vector<float>> centroids;
         std::vector<int> labels;

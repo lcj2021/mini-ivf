@@ -74,6 +74,7 @@ namespace {
             }
 
             // Update centroids based on assigned observations
+            #pragma omp parallel for
             for (int j = 0; j < k; ++j) {
                 std::vector<float> sum(D, 0.0);
                 int count = 0;
