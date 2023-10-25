@@ -1,7 +1,7 @@
-#include "quantizer.h"
-#include "kmeans.h"
-#include "binary_io.h"
-#include "util.h"
+#include "quantizer.hpp"
+#include "kmeans.hpp"
+#include "binary_io.hpp"
+#include "util.hpp"
 #include <algorithm>
 #include <tuple>
 namespace Quantizer {
@@ -57,7 +57,6 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
     }
 
     auto traindata_trim = traindata;
-    // traindata_trim.resize(std::min((size_t)100'000, N_) * D_);
     size_t Nt = traindata_trim.size() / D_;
     std::vector<std::vector<float>> train_vecs(Nt, std::vector<float>(D_));
 

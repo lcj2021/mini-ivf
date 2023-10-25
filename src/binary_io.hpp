@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
-#include <assert.h>
+#include <cassert>
 
 // return the dimention of corresponding dataset
 template<typename T>
@@ -29,13 +29,12 @@ std::pair<size_t, size_t> load_from_file_binary(std::vector<T>& data, const std:
     float sep;
     for (size_t n = 0; n < N; ++n) {
         file.read(reinterpret_cast<char*>(&sep), 4);
-        file.read(reinterpret_cast<char*>(data.data() + n * D), D * sizeof(float));
+        file.read(reinterpret_cast<char*>(data.data() + n * D), D * sizeof(T));
     }
     printf("%s: [%zu x %d] has loaded!\n", filename.data(), N, D);
     file.close();
     return {N, D};
 }
-
 template<typename T>
 std::pair<size_t, size_t> load_from_file_binary(std::vector<T>& data, const std::string& filename, size_t expect_read_n) {
     std::ifstream file(filename, std::ios::binary);

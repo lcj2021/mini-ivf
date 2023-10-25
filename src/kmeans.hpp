@@ -6,8 +6,8 @@
 #include <string>
 #include <random>
 #include <numeric>
-#include "assert.h"
-#include "distance.h"
+#include <cassert>
+#include "distance.hpp"
 
 namespace {
     // Linear search by L2 Distance computation. Return the best one (id, distance)

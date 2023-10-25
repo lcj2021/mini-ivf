@@ -14,12 +14,9 @@ else()
     include_directories(${HDF5_INCLUDE_DIR})
 endif()
 
-set(OpenMP "/var/lib/docker/lcj_graph_partitioning/mpi/openmpi-1.4.5")
+# set(OpenMP "/var/lib/docker/lcj_graph_partitioning/mpi/openmpi-1.4.5")
 find_package(OpenMP REQUIRED)
 include_directories(${OpenMP_CXX_INCLUDE_DIRS})
-
-set(SRC_DIR "src")  
-set(TESTS_DIR "tests")
 
 add_subdirectory(src)
 add_subdirectory(tests)

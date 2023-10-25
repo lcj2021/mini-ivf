@@ -12,13 +12,14 @@ size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
 size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
-size_t nq = 1'000;
+size_t nq = 5;
 int ncentroids = 1000;
 int nprobe = ncentroids;
 
 std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
                 + "_kc" + std::to_string(ncentroids);
 std::string db_path = "/RF/dataset/sift";
+
 
 int main() {
     std::vector<float> database;
@@ -42,44 +43,33 @@ int main() {
     Toy::IndexIVFPQ index(cfg, nq, true);
     // index.train(database, 123, true);
     // index.write_index(index_path);
-    index.load_index(index_path);
-    index.populate(database);
+    // index.load_index(index_path);
+    // index.populate(database);
+    std::vector<uint32_t> book{0, 2, 4, 67, 21, 123, 321, 234, 567, 764, 232};
+    index.load_from_book(book, db_path + "/sift1m_pq128_kc1000_cluster");
 
-    puts("Index find kNN!");
-    // Recall@k
-    int k = 100;
-    std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
-    std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    Timer timer_query;
-    timer_query.start();
-    size_t total_searched_cnt = 0;
-    
-    #pragma omp parallel for reduction(+ : total_searched_cnt)
-    for (size_t q = 0; q < nq; ++q) {
-        size_t searched_cnt;
-        index.query_exhausted(
-            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
-            nnid[q], dist[q], searched_cnt, 
-             k, nb, q
-        );
-        total_searched_cnt += searched_cnt;
+    std::iota(book.begin(), book.end(), (uint32_t)0);
+    index.load_from_book(book, db_path + "/sift1m_pq128_kc1000_cluster");
+
+
+    index.load_pq_codebook(db_path + "/sift1m_pq128_kc1000_cluster");
+    index.load_cq_codebook(db_path + "/sift1m_pq128_kc1000_cluster");
+
+    query.resize(nq * D);
+    auto nested_queries = nest_2d(query, {nq, D});
+    std::vector<std::vector<uint32_t>> topw;
+    index.top_w_id(50, nested_queries, topw);
+    for (size_t n = 0; n < nq; ++n) {
+        std::cerr << "Query " << n << " :\n";
+        for (const auto& id : topw[n]) {
+            std::cerr << id << ", ";
+        }
+        std::cerr << std::endl;
     }
-    timer_query.stop();
-    std::cout << timer_query.get_time() << " seconds.\n";
 
-    index.set_trainset_path(db_path + "/sift1m_pq128_1m_kc100_seg20", 1);
-
+    // index.set_cluster_vector_path(db_path + "/sift1m_pq128_kc1000_cluster");
+    // index.set_cluster_id_path(db_path + "/sift1m_pq128_kc1000_cluster");
     index.finalize();
-
-    int n_ok = 0;
-    for (int q = 0; q < nq; ++q) {
-        std::unordered_set<int> S(gt.begin() + q * 100, gt.begin() + q * 100 + k);
-        for (int i = 0; i < k; ++i)
-            if (S.count(nnid[q][i]))
-                n_ok++;
-    }
-    std::cout << (double)n_ok / (nq * k) << '\n';
 
     return 0;
 }

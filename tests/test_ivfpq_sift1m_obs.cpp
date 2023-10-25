@@ -3,10 +3,10 @@
 #include <numeric>
 #include <unordered_set>
 
-#include "binary_io.h"
-#include "index_ivfpq.h"
-#include "quantizer.h"
-#include "util.h"
+#include "binary_io.hpp"
+#include "index_ivfpq.hpp"
+#include "quantizer.hpp"
+#include "util.hpp"
 
 size_t D;           // dimension of the vectors to index
 size_t nb;          // size of the database we plan to index
@@ -16,28 +16,33 @@ size_t nq = 1'0;
 int ncentroids = 100;
 int nprobe = ncentroids;
 
+std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
+                    + "_kc" + std::to_string(ncentroids);
+std::string db_path = "/RF/dataset/sift";
+
 int main() {
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, "/RF/dataset/sift/sift_base.fvecs");
+    std::tie(nb, D) = load_from_file_binary(database, db_path + "/sift_base.fvecs");
 
     const auto& query = database;
     // std::vector<float> query;
-    // load_from_file_binary(query, "/RF/dataset/sift/sift_query.fvecs");
+    // load_from_file_binary(query, db_path + "/sift_query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_binary(gt, "/RF/dataset/sift/sift_train_groundtruth.ivecs");
-    // load_from_file_binary(gt, "/RF/dataset/sift/sift_query_groundtruth.ivecs");
+    load_from_file_binary(gt, db_path + "/sift_train_groundtruth.ivecs");
+    // load_from_file_binary(gt, db_path + "/sift_query_groundtruth.ivecs");
 
-    Toy::IVFPQConfig cfg(nb, D, nprobe, nb, 
-                    ncentroids, 256, 
-                    1, mp, 
-                    D, D / mp);
-    Toy::IndexIVFPQ index(cfg, nq, true, true);
-    std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
-                        + "_kc" + std::to_string(ncentroids);
+    Toy::IVFPQConfig cfg(
+        nb, D, nb, 
+        ncentroids, 256, 
+        1, mp, 
+        D, D / mp,
+        index_path, db_path
+    );
+    Toy::IndexIVFPQ index(cfg, nq, true);
     // index.train(database, 123, true);
-    // index.write(index_path);
-    index.load(index_path);
+    // index.write_index(index_path);
+    index.load_index(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -45,18 +50,19 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
+    size_t total_searched_cnt = 0;
     
-    // #pragma omp parallel for
+    #pragma omp parallel for reduction(+ : total_searched_cnt)
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.query_obs(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
             nnid[q], dist[q], searched_cnt, 
-             k, nb, q);
+             k, nb, q
+        );
         total_searched_cnt += searched_cnt;
     }
     timer_query.stop();

@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <vector>
-#include <assert.h>
+#include <cassert>
 #include <H5Cpp.h>
 
 template <typename T>

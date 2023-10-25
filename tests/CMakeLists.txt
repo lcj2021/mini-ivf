@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(TEST_SOURCES
     test_binary_io.cpp
-    test_hdf5_io.cpp
+    # test_hdf5_io.cpp
     test_ivf.cpp
     test_ivfpq.cpp
     test_ivfpq_gist1m_baseline.cpp
@@ -15,7 +15,10 @@ set(TEST_SOURCES
     test_ivfpq_sift1m_obs.cpp
     test_ivf_sift1m_baseline.cpp
     get_ivfpq_trainset.cpp
-    get_groundtruth.cpp)
+    get_ivfpq_file.cpp
+    get_groundtruth.cpp
+    test_ivfpq_load_book.cpp
+)
 
 foreach(TEST_SOURCE ${TEST_SOURCES})
     get_filename_component(TEST_NAME ${TEST_SOURCE} NAME_WE)
@@ -25,7 +28,8 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     target_compile_options(${TEST_NAME} PUBLIC 
             -O3
             -march=native
-            -mtune=native)
+            -mtune=native
+    )
 endforeach()
 
 

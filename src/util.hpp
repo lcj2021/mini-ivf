@@ -3,6 +3,8 @@
 
 #include <chrono>
 #include <vector>
+#include <cassert>
+#include <string>
 
 class Timer
 {
@@ -12,15 +14,10 @@ class Timer
 
   public:
     Timer() : total(0) {}
-    void reset() { total = 0; }
-    void start() { t1 = std::chrono::system_clock::now(); }
-    void stop()
-    {
-        t2 = std::chrono::system_clock::now();
-        std::chrono::duration<double> diff = t2 - t1;
-        total += diff.count();
-    }
-    double get_time() { return total; }
+    void reset();
+    void start();
+    void stop();
+    double get_time();
 };
 
 template<typename T>
@@ -66,5 +63,29 @@ nest(const std::vector<T>& flattened, const std::vector<size_t>& shape)
     }
     return nested;
 }
+
+template<typename T>
+std::vector<std::vector<T>>
+nest_2d(const std::vector<T>& flattened, const std::vector<size_t>& shape)
+{
+    assert(shape.size() == 2);
+    auto d0 = shape[0];
+    auto d1 = shape[1];
+    assert(flattened.size() == d0 * d1);
+
+    std::vector<std::vector<T>> nested(d0, 
+        std::vector<T>(d1));
+
+    size_t cursor = 0;
+    for (size_t i0 = 0; i0 < d0; ++i0) {
+        for (size_t i1 = 0; i1 < d1; ++i1) {
+            nested[i0][i1] = flattened[cursor ++];
+        }
+    }
+    return nested;
+}
+
+void modify_path(std::string& path);
+std::string to_string_with_units(int nt);
 
 #endif

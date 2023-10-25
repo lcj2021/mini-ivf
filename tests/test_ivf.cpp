@@ -4,9 +4,9 @@
 #include <iostream>
 #include <numeric>
 
-#include "index_ivf.h"
-#include "quantizer.h"
-#include "util.h"
+#include "index_ivf.hpp"
+#include "quantizer.hpp"
+#include "util.hpp"
 
 
 size_t D = 64;              // dimension of the vectors to index
@@ -19,10 +19,10 @@ size_t segs = 20;
 int ncentroids = 25;
 int nprobe = 25;
 
-Toy::IVFConfig cfg(nb, D, nprobe, nb / 50, 
-                    ncentroids, 
-                    1,
-                    D, segs);
+Toy::IVFConfig cfg(nb, D, nb / 50, 
+    ncentroids, 1, D,
+    "", ""
+);
 
 int main() {
     std::mt19937 rng;
@@ -47,7 +47,7 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVF index(cfg, nq, true, false);
+    Toy::IndexIVF index(cfg, nq, true);
     index.train(database_flat, 123, false);
     index.populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
@@ -83,17 +83,18 @@ int main() {
     int k = 100;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
-    size_t total_searched_cnt = 0;
     Timer timer_query;
     timer_query.start();
+    size_t total_searched_cnt = 0;
 
-    // #pragma omp parallel for
+    #pragma omp parallel for reduction(+ : total_searched_cnt)
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
-            k, nb, q);
+            k, nb, q, nprobe
+        );
         total_searched_cnt += searched_cnt;
     }
     timer_query.stop();

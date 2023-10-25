@@ -4,9 +4,9 @@
 #include <iostream>
 #include <numeric>
 
-#include "index_ivfpq.h"
-#include "quantizer.h"
-#include "util.h"
+#include "index_ivfpq.hpp"
+#include "quantizer.hpp"
+#include "util.hpp"
 
 
 size_t D = 64;              // dimension of the vectors to index
@@ -19,10 +19,13 @@ size_t nq = 2'000;               // size of the query we plan to search
 int ncentroids = 25;
 int nprobe = 10;
 
-Toy::IVFPQConfig cfg(nb, D, nprobe, nb / 50, 
-                    ncentroids, 256, 
-                    1, mp, 
-                    D, D / mp);
+Toy::IVFPQConfig cfg(
+    nb, D, nprobe, nb / 50, 
+    256, 
+    1, mp, 
+    D, D / mp,
+    "", ""
+);
 
 int main() {
     std::mt19937 rng;
@@ -47,7 +50,7 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVFPQ index(cfg, nq, true, false);
+    Toy::IndexIVFPQ index(cfg, nq, true);
     index.train(database_flat, 123, false);
     index.populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
@@ -91,7 +94,8 @@ int main() {
         index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
-             k, nb, q);
+        k, nb, q, nprobe
+        );
         searched_cnt += searched_cnt;
     }
     timer_query.stop();

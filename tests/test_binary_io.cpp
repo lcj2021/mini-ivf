@@ -3,7 +3,7 @@
 #include <numeric>
 #include <unordered_set>
 
-#include "binary_io.h"
+#include "binary_io.hpp"
 #include <assert.h>
 #include <algorithm>
 #include <iomanip>
