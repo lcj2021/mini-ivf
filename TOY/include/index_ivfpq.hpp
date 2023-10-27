@@ -50,10 +50,10 @@ struct DistanceTable {
     // Helper structure. This is identical to vec<vec<float>> dt(M, vec<float>(Ks))
     DistanceTable() {}
     DistanceTable(size_t M, size_t Ks) : kp(Ks), data_(M * Ks) {}
-    void set_value(size_t m, size_t ks, float val) {
+    inline void set_value(size_t m, size_t ks, float val) {
         data_[m * kp + ks] = val;
     }
-    float get_value(size_t m, size_t ks) const {
+    inline float get_value(size_t m, size_t ks) const {
         return data_[m * kp + ks];
     }
     size_t kp;
@@ -78,7 +78,8 @@ public:
     top_w_id(
         int w, 
         const std::vector<std::vector<float>>& queries,
-        std::vector<std::vector<uint32_t>>& topw
+        std::vector<std::vector<uint32_t>>& topw,
+        int num_threads
     );
 
     void 

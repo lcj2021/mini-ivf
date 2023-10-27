@@ -283,7 +283,7 @@ GlobalNode::runQueries(
     std::vector<std::vector<cluster_id_t>> topws_global(queries.size());
     
     /// @brief to get topw from index
-    index_ptr->top_w_id(w, queries, topw);
+    index_ptr->top_w_id(w, queries, topw, num_threads);
     for (size_t i = 0; i < queries.size(); i++) {
         const auto & topw4query = topw[i];
         for (auto cid: topw4query) {
