@@ -1,0 +1,46 @@
+
+//******************************************************************************
+// RCF - Remote Call Framework
+//
+// Copyright (c) 2005 - 2023, Delta V Software. All rights reserved.
+// https://www.deltavsoft.com
+//
+// RCF is distributed under dual licenses - closed source or GPL.
+// Consult your particular license for conditions of use.
+//
+// If you have not purchased a commercial license, you are using RCF under GPL terms.
+//
+// Version: 3.4
+// Contact: support <at> deltavsoft.com 
+//
+//******************************************************************************
+
+#ifndef INCLUDE_RCF_TIMER_HPP
+#define INCLUDE_RCF_TIMER_HPP
+
+#include <RCF/Export.hpp>
+
+#include <cstdint>
+
+namespace RCF {
+
+    class RCF_EXPORT Timer
+    {
+    public:
+
+        Timer();
+        Timer(std::uint32_t startTimeMs);
+
+        bool                elapsed(std::uint32_t durationMs);
+        void                restart();
+        void                restart(std::uint32_t startTimeMs);
+        std::uint32_t       getStartTimeMs();
+        std::uint32_t       getDurationMs();
+
+    private:
+        std::uint32_t mStartTimeMs;
+    };
+
+}
+
+#endif // ! INCLUDE_RCF_TIMER_HPP
