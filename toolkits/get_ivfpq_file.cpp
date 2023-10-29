@@ -34,13 +34,13 @@ int main() {
 
     std::cerr << out_db_path << '\n' << index_path << '\n' << db_path << '\n';
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "base.fvecs");
 
     std::vector<float> query;
-    load_from_file_binary(query, db_path + "query.fvecs");
+    load_from_file_binary<float>(query, db_path + "query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_binary(gt, db_path + "query_groundtruth.ivecs");
+    load_from_file_binary<int>(gt, db_path + "query_groundtruth.ivecs");
 
     Toy::IVFPQConfig cfg(
         nb, D, nb, 

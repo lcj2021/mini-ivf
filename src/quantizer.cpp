@@ -108,7 +108,7 @@ Quantizer::load(std::string quantizer_path)
     std::string assign_suffix = "assignments.ivecs";
     std::vector<float> flat_center;
     // std::vector<int> flat_assign;
-    load_from_file_binary(flat_center, quantizer_path + center_suffix);
+    load_from_file_binary<float>(flat_center, quantizer_path + center_suffix);
     // load_from_file_binary(flat_assign, quantizer_path + assign_suffix);
     this->centers_ = nest(flat_center, std::vector<size_t>{M_, K_, Ds_});
     // this->assignments_ = nest(flat_assign, std::vector<size_t>{M_, K_, Ds_});

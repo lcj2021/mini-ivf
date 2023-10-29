@@ -99,6 +99,23 @@ IndexIVF::insert_ivf(const std::vector<float>& rawdata)
     }
 }
 
+void 
+IndexIVF::load_cq_codebook(std::string cq_codebook_path)
+{
+    if (verbose_) { std::cout << "Start to load cq codebook" << std::endl; }
+
+    if (cq_codebook_path.back() != '/') {
+        cq_codebook_path += "/";
+    }
+
+    std::string cq_suffix = "cq_";
+
+    cq_ = std::make_unique<Quantizer::Quantizer>(D_, 200'000, mc, kc, true);
+    cq_->load(cq_codebook_path + cq_suffix);
+
+    centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
+    std::cerr << "CQ codebook loaded.\n";
+}
 
 void 
 IndexIVF::populate(const std::vector<float>& rawdata)
@@ -127,6 +144,28 @@ IndexIVF::populate(const std::vector<float>& rawdata)
     if (verbose_) {
         std::cout << N_ << " new vectors are added." << std::endl;
     }
+}
+
+void 
+IndexIVF::load_index(std::string index_path)
+{
+    if (index_path.back() != '/') {
+        index_path += "/";
+    }
+
+    load_cq_codebook(index_path);
+
+    is_trained_ = true;
+}
+
+void
+IndexIVF::write_index(std::string index_path)
+{
+    if (index_path.back() != '/') {
+        index_path += "/";
+    }
+    std::string cq_suffix = "cq_";
+    cq_->write(index_path + cq_suffix);
 }
 
 void

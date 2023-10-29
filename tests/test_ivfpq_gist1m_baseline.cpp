@@ -24,15 +24,15 @@ int main(int argc, char* argv[]) {
     modify_path(index_path);
     modify_path(db_path);
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "base.fvecs");
 
     // auto& query = database;
     std::vector<float> query;
-    load_from_file_binary(query, db_path + "query.fvecs");
+    load_from_file_binary<float>(query, db_path + "query.fvecs");
 
     std::vector<int> gt;
     // load_from_file_binary(gt, db_path + "train_groundtruth.ivecs");
-    load_from_file_binary(gt, db_path + "query_groundtruth.ivecs");
+    load_from_file_binary<int>(gt, db_path + "query_groundtruth.ivecs");
 
     int nprobe = std::atoi(argv[1]);
 

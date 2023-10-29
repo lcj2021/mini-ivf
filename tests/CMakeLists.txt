@@ -11,12 +11,10 @@ set(TEST_SOURCES
     test_ivfpq.cpp
     test_ivfpq_gist1m_baseline.cpp
     test_ivfpq_sift1m_baseline.cpp
-    test_ivfpq_gist1m_obs.cpp
-    test_ivfpq_sift1m_obs.cpp
+    test_ivfpq_sift10m_baseline.cpp
     test_ivf_sift1m_baseline.cpp
-    get_ivfpq_trainset.cpp
-    get_ivfpq_file.cpp
-    get_groundtruth.cpp
+    test_ivf_sift10m_baseline.cpp
+    test_ivf_sift100m_baseline.cpp
     test_ivfpq_load_book.cpp
 )
 

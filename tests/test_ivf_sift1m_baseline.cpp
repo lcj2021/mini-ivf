@@ -13,26 +13,26 @@ size_t nb;       // size of the database we plan to index
 size_t nt = 200'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 1'000;
-int ncentroids = 4'000;
+int ncentroids = 1;
 
-std::string suffix = "nt" + to_string_with_units(nt) 
-                    + "_pq" + std::to_string(mp)
+std::string suffix = "nt" + to_string_with_units(nt)
                     + "_kc" + std::to_string(ncentroids);
 
-std::string index_path = std::string("/home/anns/index/sift1m/")
+std::string index_path = std::string("/dk/anns/index/sift1m/")
                     + suffix;
-std::string db_path = "/RF/dataset/sift1m";
+std::string db_path = "/dk/anns/dataset/sift1m";
+std::string query_path = "/dk/anns/query/sift1m";
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "/base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "/base.fvecs");
 
     std::vector<float> query;
-    load_from_file_binary(query, db_path + "/query.fvecs");
+    load_from_file_binary<float>(query, query_path + "/query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_binary(gt, db_path + "/query_groundtruth.ivecs");
+    auto [n_gt, d_gt] = load_from_file_binary<int>(gt, query_path + "/gt.ivecs");
 
     int nprobe = std::atoi(argv[1]);
 
@@ -43,6 +43,8 @@ int main(int argc, char* argv[]) {
     );
     Toy::IndexIVF index(cfg, nq, true);
     index.train(database, 123, true);
+    // index.write_index(index_path);
+    // index.load_index(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -70,7 +72,7 @@ int main(int argc, char* argv[]) {
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {
-        std::unordered_set<int> S(gt.begin() + q * 100, gt.begin() + q * 100 + k);
+        std::unordered_set<int> S(gt.begin() + q * d_gt, gt.begin() + q * d_gt + k);
         for (int i = 0; i < k; ++i)
             if (S.count(nnid[q][i]))
                 n_ok++;

@@ -142,8 +142,8 @@ IndexIVFPQ::load_from_book(const std::vector<uint32_t>& book, std::string cluste
     }
 
     for (const auto& id : new_book_set) {
-        load_from_file_binary(posting_lists_[id], cluster_path + prefix_id + std::to_string(id) + suffix_id);
-        load_from_file_binary(db_codes_[id], cluster_path + prefix_vector + std::to_string(id) + suffix_vector);
+        load_from_file_binary<uint32_t>(posting_lists_[id], cluster_path + prefix_id + std::to_string(id) + suffix_id);
+        load_from_file_binary<uint8_t>(db_codes_[id], cluster_path + prefix_vector + std::to_string(id) + suffix_vector);
     }
 
     if (verbose_) {

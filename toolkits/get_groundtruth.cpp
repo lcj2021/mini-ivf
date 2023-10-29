@@ -24,7 +24,7 @@ std::string db_path = "/RF/dataset/sift1m";
 
 int main() {
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "/base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "/base.fvecs");
 
     const auto& query = database;
 

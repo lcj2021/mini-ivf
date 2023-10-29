@@ -45,7 +45,10 @@ public:
     IndexIVF(const IVFConfig& cfg, size_t nq, bool verbose);
 
     void populate(const std::vector<float>& rawdata);
+    void load_cq_codebook(std::string cq_codebook_path);
     void train(const std::vector<float>& rawdata, int seed, size_t nsamples);
+    void load_index(std::string index_path);
+    void write_index(std::string index_path);
 
     // IVF baseline
     void
@@ -59,7 +62,8 @@ public:
         int id, 
         int W
     );
-
+    
+private:
     void insert_ivf(const std::vector<float>& rawdata);
 
     const std::vector<float> get_single_code(size_t list_no, size_t offset) const;

@@ -8,29 +8,34 @@
 #include "quantizer.hpp"
 #include "util.hpp"
 
-size_t D;           // dimension of the vectors to index
-size_t nb;          // size of the database we plan to index
-size_t nt;          // make a set of nt training vectors in the unit cube (could be the database)
+size_t D;              // dimension of the vectors to index
+size_t nb;       // size of the database we plan to index
+size_t nt = 200'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 1'000;
-int ncentroids = 1000;
-int nprobe = ncentroids;
+int ncentroids = 1'000;
 
-std::string index_path = "/RF/index/sift/sift1m_pq" + std::to_string(mp)
-                + "_kc" + std::to_string(ncentroids);
-std::string db_path = "/RF/dataset/sift";
+std::string suffix = "nt" + to_string_with_units(nt) 
+                    + "_pq" + std::to_string(mp)
+                    + "_kc" + std::to_string(ncentroids);
 
-int main() {
+std::string index_path = std::string("/dk/anns/index/sift10m/")
+                    + suffix;
+std::string db_path = "/dk/anns/dataset/sift10m";
+std::string query_path = "/dk/anns/query/sift10m";
+
+int main(int argc, char* argv[]) {
+    assert(argc == 2);
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "/sift_base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "/base.fvecs");
 
-    // const auto& query = database;
     std::vector<float> query;
-    load_from_file_binary(query, db_path + "/sift_query.fvecs");
+    load_from_file_binary<float>(query, db_path + "/query.fvecs");
 
     std::vector<int> gt;
-    // load_from_file_binary(gt, db_path + "/sift_train_groundtruth.ivecs");
-    load_from_file_binary(gt, db_path + "/sift_query_groundtruth.ivecs");
+    load_from_file_binary<int>(gt, db_path + "/query_groundtruth.ivecs");
+
+    int nprobe = std::atoi(argv[1]);
 
     Toy::IVFPQConfig cfg(
         nb, D, nb, 
@@ -40,9 +45,12 @@ int main() {
         index_path, db_path
     );
     Toy::IndexIVFPQ index(cfg, nq, true);
-    // index.train(database, 123, true);
+    // index.load_index(index_path);
+    // std::vector<uint32_t> book(ncentroids);
+    // std::iota(book.begin(), book.end(), (uint32_t)0);
+    // index.load_from_book(book, "/home/anns/dataset/sift10m/" + suffix);
+    index.train(database, 123, true);
     // index.write_index(index_path);
-    index.load_index(index_path);
     index.populate(database);
 
     puts("Index find kNN!");
@@ -53,23 +61,20 @@ int main() {
     Timer timer_query;
     timer_query.start();
     size_t total_searched_cnt = 0;
-    
+
     #pragma omp parallel for reduction(+ : total_searched_cnt)
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        index.query_exhausted(
+        index.query_baseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
-            std::vector<int>(gt.begin() + q * 100, gt.begin() + q * 100 + k), 
             nnid[q], dist[q], searched_cnt, 
-             k, nb, q
+             k, nb, q, nprobe
         );
         total_searched_cnt += searched_cnt;
     }
     timer_query.stop();
     std::cout << timer_query.get_time() << " seconds.\n";
-
-    index.set_trainset_path(db_path + "/sift1m_pq128_1m_kc100_seg20", 1);
-
+    
     index.finalize();
 
     int n_ok = 0;
@@ -79,7 +84,9 @@ int main() {
             if (S.count(nnid[q][i]))
                 n_ok++;
     }
-    std::cout << (double)n_ok / (nq * k) << '\n';
+    std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
+    std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
+    printf("PQ%lu, kc%d, W%d\n", mp, ncentroids, nprobe);
 
     return 0;
 }

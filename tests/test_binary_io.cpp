@@ -35,9 +35,9 @@ int main() {
     // load_from_file_binary(test_read_sift_d, "../../dataset/sift/sift_train_distance.ivecs");
 
     std::vector<float> test_read_l, test_read_r, test_read_distance;
-    load_from_file_binary(test_read_l, "./sift1m_l.fvecs");
-    load_from_file_binary(test_read_r, "./sift1m_r.fvecs");
-    load_from_file_binary(test_read_distance, "./sift1m_distance.fvecs");
+    load_from_file_binary<float>(test_read_l, "./sift1m_l.fvecs");
+    load_from_file_binary<float>(test_read_r, "./sift1m_r.fvecs");
+    load_from_file_binary<float>(test_read_distance, "./sift1m_distance.fvecs");
     std::cout << std::fixed << std::setprecision(2);
     puts("l: ");
     for (size_t i = 0; i < 2; ++i)
@@ -54,8 +54,8 @@ int main() {
 
     std::vector<float> test_read_farthest;
     std::vector<int> test_read_distribution;
-    load_from_file_binary(test_read_farthest, "./sift1m_farthest.fvecs");
-    load_from_file_binary(test_read_distribution, "./sift1m_distribution.fvecs");
+    load_from_file_binary<float>(test_read_farthest, "./sift1m_farthest.fvecs");
+    load_from_file_binary<int>(test_read_distribution, "./sift1m_distribution.fvecs");
     puts("farthest: ");
     for (size_t i = 0; i < 5; ++i)
         std::cout << test_read_farthest[i] << " \n"[i == 4];
@@ -65,8 +65,8 @@ int main() {
             std::cout << test_read_distribution[i * 20 + j] << " \n"[j == 19];
 
     std::vector<int> test_read_querycodes, test_read_centroidcodes;
-    load_from_file_binary(test_read_querycodes, "./sift1m_querycodes.ivecs");
-    load_from_file_binary(test_read_centroidcodes, "./sift1m_centroidcodes.ivecs");
+    load_from_file_binary<int>(test_read_querycodes, "./sift1m_querycodes.ivecs");
+    load_from_file_binary<int>(test_read_centroidcodes, "./sift1m_centroidcodes.ivecs");
     puts("querycodes: ");
     for (size_t i = 0; i < 2; ++i)
         for (size_t j = 0; j < 64; ++j)

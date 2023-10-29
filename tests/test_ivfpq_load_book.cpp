@@ -23,15 +23,15 @@ std::string db_path = "/RF/dataset/sift";
 
 int main() {
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary(database, db_path + "/sift_base.fvecs");
+    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "/sift_base.fvecs");
 
     // const auto& query = database;
     std::vector<float> query;
-    load_from_file_binary(query, db_path + "/sift_query.fvecs");
+    load_from_file_binary<float>(query, db_path + "/sift_query.fvecs");
 
     std::vector<int> gt;
     // load_from_file_binary(gt, db_path + "/sift_train_groundtruth.ivecs");
-    load_from_file_binary(gt, db_path + "/sift_query_groundtruth.ivecs");
+    load_from_file_binary<int>(gt, db_path + "/sift_query_groundtruth.ivecs");
 
     Toy::IVFPQConfig cfg(
         nb, D, nb, 
