@@ -254,6 +254,6 @@ float fvec_L2sqr(const float *x, const float *y, size_t d)
 
 
 
-} // namespace Toy
+} // namespace toy
 
 #endif // DISTANCE_H

@@ -12,7 +12,7 @@
 namespace {
     // Linear search by L2 Distance computation. Return the best one (id, distance)
     std::pair<size_t, float> 
-    nearest_center(const std::vector<float>& query, const std::vector<std::vector<float>>& centers) 
+    NearestCenter(const std::vector<float>& query, const std::vector<std::vector<float>>& centers) 
     {
         std::vector<float> dists(centers.size());
         size_t K_ = centers.size(), Ds_ = centers[0].size();
@@ -70,7 +70,7 @@ namespace {
             #pragma omp parallel for
             for (int i = 0; i < N; ++i) {
                 float min_dist;
-                std::tie(labels[i], min_dist) = nearest_center(obs[i], centroids);
+                std::tie(labels[i], min_dist) = NearestCenter(obs[i], centroids);
             }
 
             // Update centroids based on assigned observations

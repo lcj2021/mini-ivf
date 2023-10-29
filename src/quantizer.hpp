@@ -21,11 +21,11 @@ public:
     const std::vector<std::vector<int>>& get_assignments();
 
     void set_centroids(const std::vector<std::vector<std::vector<float>>>& centers_new);
-    void load(std::string quantizer_path);
-    void write(std::string quantizer_path);
+    void Load(std::string quantizer_path);
+    void Write(std::string quantizer_path);
     const std::vector<std::vector<std::vector<float>>>& get_centroids();
-    std::vector<std::vector<uint8_t>> encode(const std::vector<float>& rawdata);
-    std::vector<std::vector<uint8_t>> encode(const std::vector<std::vector<float>>& rawdata);
+    std::vector<std::vector<uint8_t>> Encode(const std::vector<float>& rawdata);
+    std::vector<std::vector<uint8_t>> Encode(const std::vector<std::vector<float>>& rawdata);
 
 private:
     size_t D_;  // the demension of each vector
@@ -42,10 +42,10 @@ private:
     std::vector<std::vector<int>> assignments_;  
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<float> nth_vector(const std::vector<float>& long_code, size_t n);
+    std::vector<float> NthVector(const std::vector<float>& long_code, size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    std::vector<float> nth_vector_mth_element(const std::vector<float>& long_code, size_t n, int m);
+    std::vector<float> NthVectorMthElement(const std::vector<float>& long_code, size_t n, int m);
 
 };
 

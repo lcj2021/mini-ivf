@@ -1,6 +1,6 @@
 #include <index_ivf.hpp>
 
-using namespace Toy;
+using namespace toy;
 
 extern "C" {
     void omp_init_lock(omp_lock_t *);
@@ -36,7 +36,7 @@ IndexIVF::IndexIVF(const IVFConfig& cfg, size_t nq, bool verbose)
 }
 
 void 
-IndexIVF::train(const std::vector<float>& rawdata, int seed, size_t nsamples)
+IndexIVF::Train(const std::vector<float>& rawdata, int seed, size_t nsamples)
 {
     size_t Nt_ = rawdata.size() / D_;
     if (nsamples < 100'000) nsamples = 100'000;
@@ -69,7 +69,7 @@ IndexIVF::train(const std::vector<float>& rawdata, int seed, size_t nsamples)
 }
 
 void 
-IndexIVF::insert_ivf(const std::vector<float>& rawdata)
+IndexIVF::InsertIvf(const std::vector<float>& rawdata)
 {
     std::vector<omp_lock_t> locks(kc);
 
@@ -79,7 +79,7 @@ IndexIVF::insert_ivf(const std::vector<float>& rawdata)
 
     #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
-        const auto& vec = nth_raw_vector(rawdata, n);
+        const auto& vec = NthRawVector(rawdata, n);
         int id = cq_->predict_one(vec, 0);
         omp_set_lock(&locks[id]);
         posting_lists_[id].emplace_back(n);
@@ -93,14 +93,14 @@ IndexIVF::insert_ivf(const std::vector<float>& rawdata)
     #pragma omp parallel for
     for (size_t no = 0; no < kc; ++no) {
         for (const auto& id : posting_lists_[no]) {
-            const auto& nth_code = nth_raw_vector(rawdata, id);
+            const auto& nth_code = NthRawVector(rawdata, id);
             db_codes_[no].insert(db_codes_[no].end(), nth_code.begin(), nth_code.end());
         }
     }
 }
 
 void 
-IndexIVF::load_cq_codebook(std::string cq_codebook_path)
+IndexIVF::LoadCqCodebook(std::string cq_codebook_path)
 {
     if (verbose_) { std::cout << "Start to load cq codebook" << std::endl; }
 
@@ -111,18 +111,18 @@ IndexIVF::load_cq_codebook(std::string cq_codebook_path)
     std::string cq_suffix = "cq_";
 
     cq_ = std::make_unique<Quantizer::Quantizer>(D_, 200'000, mc, kc, true);
-    cq_->load(cq_codebook_path + cq_suffix);
+    cq_->Load(cq_codebook_path + cq_suffix);
 
     centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
     std::cerr << "CQ codebook loaded.\n";
 }
 
 void 
-IndexIVF::populate(const std::vector<float>& rawdata)
+IndexIVF::Populate(const std::vector<float>& rawdata)
 {
     assert(rawdata.size() / D_ == N_);
     if (!is_trained_ || centers_cq_.empty()) {
-        std::cerr << "Error. train() must be called before running populate(vecs=X).\n";
+        std::cerr << "Error. Train() must be called before running Populate(vecs=X).\n";
         throw;
     }
 
@@ -139,7 +139,7 @@ IndexIVF::populate(const std::vector<float>& rawdata)
     for (auto& code : db_codes_) {
         code.reserve(N_ / kc);  // Roughly malloc
     }
-    insert_ivf(rawdata);
+    InsertIvf(rawdata);
 
     if (verbose_) {
         std::cout << N_ << " new vectors are added." << std::endl;
@@ -147,29 +147,29 @@ IndexIVF::populate(const std::vector<float>& rawdata)
 }
 
 void 
-IndexIVF::load_index(std::string index_path)
+IndexIVF::LoadIndex(std::string index_path)
 {
     if (index_path.back() != '/') {
         index_path += "/";
     }
 
-    load_cq_codebook(index_path);
+    LoadCqCodebook(index_path);
 
     is_trained_ = true;
 }
 
 void
-IndexIVF::write_index(std::string index_path)
+IndexIVF::WriteIndex(std::string index_path)
 {
     if (index_path.back() != '/') {
         index_path += "/";
     }
     std::string cq_suffix = "cq_";
-    cq_->write(index_path + cq_suffix);
+    cq_->Write(index_path + cq_suffix);
 }
 
 void
-IndexIVF::query_baseline(
+IndexIVF::QueryBaseline(
     const std::vector<float>& query,
     std::vector<size_t>& nnid,
     std::vector<float>& dist,
@@ -185,6 +185,7 @@ IndexIVF::query_baseline(
         scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
     }
 
+    W = std::min(W, (int)kc);
     std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W, scores_coarse.end(),
         [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
             return a.second < b.second;
@@ -202,7 +203,7 @@ IndexIVF::query_baseline(
 
         for (size_t idx = 0; idx < posting_lists_len; ++idx) {
             const auto& n = posting_lists_[no][idx];
-            scores.emplace_back(n, fvec_L2sqr(query.data(), get_single_code(no, idx).data(), D_));
+            scores.emplace_back(n, fvec_L2sqr(query.data(), GetSingleCode(no, idx).data(), D_));
         }
 
         coarse_cnt++;
@@ -227,7 +228,7 @@ IndexIVF::query_baseline(
 }
 
 const std::vector<float> 
-IndexIVF::get_single_code(size_t list_no, size_t offset) const
+IndexIVF::GetSingleCode(size_t list_no, size_t offset) const
 {
     return std::vector<float>(db_codes_[list_no].begin() + offset * D_, 
                             db_codes_[list_no].begin() + (offset + 1) * D_);
@@ -235,7 +236,7 @@ IndexIVF::get_single_code(size_t list_no, size_t offset) const
 
 template<typename T>
 const std::vector<T> 
-IndexIVF::nth_raw_vector(const std::vector<T>& long_code, size_t n) const
+IndexIVF::NthRawVector(const std::vector<T>& long_code, size_t n) const
 {
     return std::vector<T>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }

@@ -12,7 +12,7 @@
 #include <omp.h>
 
 
-namespace Toy {
+namespace toy {
 
 /**
  * Configuration structure
@@ -44,15 +44,15 @@ class IndexIVF {
 public:
     IndexIVF(const IVFConfig& cfg, size_t nq, bool verbose);
 
-    void populate(const std::vector<float>& rawdata);
-    void load_cq_codebook(std::string cq_codebook_path);
-    void train(const std::vector<float>& rawdata, int seed, size_t nsamples);
-    void load_index(std::string index_path);
-    void write_index(std::string index_path);
+    void Populate(const std::vector<float>& rawdata);
+    void LoadCqCodebook(std::string cq_codebook_path);
+    void Train(const std::vector<float>& rawdata, int seed, size_t nsamples);
+    void LoadIndex(std::string index_path);
+    void WriteIndex(std::string index_path);
 
     // IVF baseline
     void
-    query_baseline(
+    QueryBaseline(
         const std::vector<float>& query,
         std::vector<size_t>& nnid,
         std::vector<float>& dist,
@@ -64,12 +64,12 @@ public:
     );
     
 private:
-    void insert_ivf(const std::vector<float>& rawdata);
+    void InsertIvf(const std::vector<float>& rawdata);
 
-    const std::vector<float> get_single_code(size_t list_no, size_t offset) const;
+    const std::vector<float> GetSingleCode(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
     template<typename T>
-    const std::vector<T> nth_raw_vector(const std::vector<T>& long_code, size_t n) const;
+    const std::vector<T> NthRawVector(const std::vector<T>& long_code, size_t n) const;
     // Member variables
     size_t N_, D_, L_, nq, kc, mc, dc;
     bool verbose_, write_trainset_, is_trained_;
@@ -85,7 +85,7 @@ private:
 };
 
 
-} // namespace Toy
+} // namespace toy
 
 
 #endif

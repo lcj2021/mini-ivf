@@ -7,13 +7,13 @@
 #include <cassert>
 
 /**
- * load_from_file_binary<type in>(type out) 
+ * LoadFromFileBinary<type in>(type out) 
  * return the dimention of corresponding dataset
  * @param data: vector that load into
  * @param filename: path of binary file
 */
 template<typename Tin, typename Tout>
-std::pair<size_t, size_t> load_from_file_binary(std::vector<Tout>& data, const std::string& filename) {
+std::pair<size_t, size_t> LoadFromFileBinary(std::vector<Tout>& data, const std::string& filename) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;
@@ -53,7 +53,7 @@ std::pair<size_t, size_t> load_from_file_binary(std::vector<Tout>& data, const s
 }
 
 template<typename Tin, typename Tout>
-std::pair<size_t, size_t> load_from_file_binary(std::vector<Tout>& data, const std::string& filename, size_t expect_read_n) {
+std::pair<size_t, size_t> LoadFromFileBinary(std::vector<Tout>& data, const std::string& filename, size_t expect_read_n) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;
@@ -98,7 +98,7 @@ std::pair<size_t, size_t> load_from_file_binary(std::vector<Tout>& data, const s
 }
 
 template<typename T>
-std::pair<size_t, size_t> load_from_file_binary_deep(std::vector<T>& data, const std::string& filename, size_t expect_read_n) {
+std::pair<size_t, size_t> LoadFromFileBinaryDeep(std::vector<T>& data, const std::string& filename, size_t expect_read_n) {
     std::ifstream file(filename, std::ios::binary);
     if (!file.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;
@@ -133,7 +133,7 @@ std::pair<size_t, size_t> load_from_file_binary_deep(std::vector<T>& data, const
 }
 
 template<typename T>
-void write_to_file_binary(const std::vector<T>& data, std::pair<size_t, size_t> dimension, const std::string& filename) {
+void WriteToFileBinary(const std::vector<T>& data, std::pair<size_t, size_t> dimension, const std::string& filename) {
     std::ofstream file(filename, std::ios::binary | std::ios::trunc);
     if (!file.is_open()) {
         std::cerr << "Error opening file: " << filename << std::endl;

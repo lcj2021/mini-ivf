@@ -14,10 +14,10 @@ class Timer
 
   public:
     Timer() : total(0) {}
-    void reset();
-    void start();
-    void stop();
-    double get_time();
+    void Reset();
+    void Start();
+    void Stop();
+    double GetTime();
 };
 
 template<typename T>
@@ -85,7 +85,7 @@ nest_2d(const std::vector<T>& flattened, const std::vector<size_t>& shape)
     return nested;
 }
 
-void modify_path(std::string& path);
-std::string to_string_with_units(int nt);
+void ModifyPath(std::string& path);
+std::string ToStringWithUnits(int nt);
 
 #endif

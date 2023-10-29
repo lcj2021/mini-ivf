@@ -19,7 +19,7 @@ size_t segs = 20;
 int ncentroids = 25;
 int nprobe = 25;
 
-Toy::IVFConfig cfg(nb, D, nb / 50, 
+toy::IVFConfig cfg(nb, D, nb / 50, 
     ncentroids, 1, D,
     "", ""
 );
@@ -47,9 +47,9 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVF index(cfg, nq, true);
-    index.train(database_flat, 123, false);
-    index.populate(database_flat);
+    toy::IndexIVF index(cfg, nq, true);
+    index.Train(database_flat, 123, false);
+    index.Populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
 
     // searching the database
@@ -84,21 +84,21 @@ int main() {
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
-    timer_query.start();
+    timer_query.Start();
     size_t total_searched_cnt = 0;
 
     #pragma omp parallel for reduction(+ : total_searched_cnt)
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        index.query_baseline(
+        index.QueryBaseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
             k, nb, q, nprobe
         );
         total_searched_cnt += searched_cnt;
     }
-    timer_query.stop();
-    std::cout << timer_query.get_time() << " seconds.\n";
+    timer_query.Stop();
+    std::cout << timer_query.GetTime() << " seconds.\n";
         
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

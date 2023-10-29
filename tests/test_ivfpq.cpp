@@ -19,7 +19,7 @@ size_t nq = 2'000;               // size of the query we plan to search
 int ncentroids = 25;
 int nprobe = 10;
 
-Toy::IVFPQConfig cfg(
+toy::IVFPQConfig cfg(
     nb, D, nprobe, nb / 50, 
     256, 
     1, mp, 
@@ -50,9 +50,9 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    Toy::IndexIVFPQ index(cfg, nq, true);
-    index.train(database_flat, 123, false);
-    index.populate(database_flat);
+    toy::IndexIVFPQ index(cfg, nq, true);
+    index.Train(database_flat, 123, false);
+    index.Populate(database_flat);
     // index.Reconfigure(ncentroids, 5);
 
     // searching the database
@@ -88,18 +88,18 @@ int main() {
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
 
     Timer timer_query;
-    timer_query.start();
+    timer_query.Start();
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
-        index.query_baseline(
+        index.QueryBaseline(
             std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
         k, nb, q, nprobe
         );
         searched_cnt += searched_cnt;
     }
-    timer_query.stop();
-    std::cout << timer_query.get_time() << " seconds.\n";
+    timer_query.Stop();
+    std::cout << timer_query.GetTime() << " seconds.\n";
         
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {

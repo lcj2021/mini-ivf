@@ -40,7 +40,7 @@ Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose=false)
 int Quantizer::predict_one(const std::vector<float>& vec, size_t m)
 {
     assert(vec.size() == Ds_);
-    std::pair<size_t, float> nearest_one = nearest_center(vec, centers_[m]);
+    std::pair<size_t, float> nearest_one = NearestCenter(vec, centers_[m]);
     return (int) nearest_one.first;
 }
 
@@ -102,33 +102,33 @@ Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>>& cen
 }
 
 void 
-Quantizer::load(std::string quantizer_path)
+Quantizer::Load(std::string quantizer_path)
 {
     std::string center_suffix = "centers.fvecs";
     std::string assign_suffix = "assignments.ivecs";
     std::vector<float> flat_center;
     // std::vector<int> flat_assign;
-    load_from_file_binary<float>(flat_center, quantizer_path + center_suffix);
-    // load_from_file_binary(flat_assign, quantizer_path + assign_suffix);
+    LoadFromFileBinary<float>(flat_center, quantizer_path + center_suffix);
+    // LoadFromFileBinary(flat_assign, quantizer_path + assign_suffix);
     this->centers_ = nest(flat_center, std::vector<size_t>{M_, K_, Ds_});
     // this->assignments_ = nest(flat_assign, std::vector<size_t>{M_, K_, Ds_});
-    // load_from_file_binary(assignments_, quantizer_path + assign_suffix);
+    // LoadFromFileBinary(assignments_, quantizer_path + assign_suffix);
 }
 
 void 
-Quantizer::write(std::string quantizer_path)
+Quantizer::Write(std::string quantizer_path)
 {
     std::string center_suffix = "centers.fvecs";
     std::string assign_suffix = "assignments.ivecs";
 
     auto flat_center = flatten(this->centers_);
     // auto flat_assign = flatten(this->assignments_);
-    write_to_file_binary(flat_center, {1, M_ * K_ * Ds_}, quantizer_path + center_suffix);
-    // write_to_file_binary(assignments_, quantizer_path + assign_suffix);
+    WriteToFileBinary(flat_center, {1, M_ * K_ * Ds_}, quantizer_path + center_suffix);
+    // WriteToFileBinary(assignments_, quantizer_path + assign_suffix);
 }
 
 std::vector<std::vector<uint8_t>> 
-Quantizer::encode(const std::vector<std::vector<float>>& rawdata) 
+Quantizer::Encode(const std::vector<std::vector<float>>& rawdata) 
 {
     size_t N = rawdata.size();
     assert(D_ == rawdata[0].size());
@@ -148,7 +148,7 @@ Quantizer::encode(const std::vector<std::vector<float>>& rawdata)
 
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = NearestCenter(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
@@ -156,7 +156,7 @@ Quantizer::encode(const std::vector<std::vector<float>>& rawdata)
 }
 
 std::vector<std::vector<uint8_t>> 
-Quantizer::encode(const std::vector<float>& rawdata) 
+Quantizer::Encode(const std::vector<float>& rawdata) 
 {
     size_t N = rawdata.size() / D_;
 
@@ -175,21 +175,21 @@ Quantizer::encode(const std::vector<float>& rawdata)
         
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            auto [min_idx, min_dist] = nearest_center(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = NearestCenter(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
     return codes;
 }
 
-std::vector<float> Quantizer::nth_vector(const std::vector<float>& long_code, size_t n)
+std::vector<float> Quantizer::NthVector(const std::vector<float>& long_code, size_t n)
 {
     return std::vector<float>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 // Each code: D = M_ * Ds_
 std::vector<float>
-Quantizer::nth_vector_mth_element(const std::vector<float>& long_code, size_t n, int m)
+Quantizer::NthVectorMthElement(const std::vector<float>& long_code, size_t n, int m)
 {
     return std::vector<float>(long_code.begin() + n * D_ + m * Ds_, 
                             long_code.begin() + n * D_ + (m + 1) * Ds_);

@@ -19,7 +19,7 @@ int ncentroids = 2000;
 int nprobe = ncentroids;
 
 string prefix = "sift1m/";
-string suffix = string("nt") + to_string_with_units(nt)
+string suffix = string("nt") + ToStringWithUnits(nt)
     + string("_pq") + std::to_string(mp) 
     + string("_kc") + std::to_string(ncentroids);
 
@@ -28,37 +28,37 @@ string index_path = "/RF/index/" + prefix + suffix;
 string db_path = "/RF/dataset/" + prefix;
 
 int main() {
-    modify_path(index_path);
-    modify_path(db_path);
-    modify_path(out_db_path);
+    ModifyPath(index_path);
+    ModifyPath(db_path);
+    ModifyPath(out_db_path);
 
     std::cerr << out_db_path << '\n' << index_path << '\n' << db_path << '\n';
     std::vector<float> database;
-    std::tie(nb, D) = load_from_file_binary<float>(database, db_path + "base.fvecs");
+    std::tie(nb, D) = LoadFromFileBinary<float>(database, db_path + "base.fvecs");
 
     std::vector<float> query;
-    load_from_file_binary<float>(query, db_path + "query.fvecs");
+    LoadFromFileBinary<float>(query, db_path + "query.fvecs");
 
     std::vector<int> gt;
-    load_from_file_binary<int>(gt, db_path + "query_groundtruth.ivecs");
+    LoadFromFileBinary<int>(gt, db_path + "query_groundtruth.ivecs");
 
-    Toy::IVFPQConfig cfg(
+    toy::IVFPQConfig cfg(
         nb, D, nb, 
         ncentroids, 256, 
         1, mp, 
         D, D / mp, 
         index_path, out_db_path
     );
-    Toy::IndexIVFPQ index(cfg, nq, true);
+    toy::IndexIVFPQ index(cfg, nq, true);
 
-    index.train(database, 123, nt);
-    index.write_index(index_path);
-    index.load_index(index_path);
-    index.populate(database);
+    index.Train(database, 123, nt);
+    index.WriteIndex(index_path);
+    index.LoadIndex(index_path);
+    index.Populate(database);
 
-    index.set_cluster_vector_path(out_db_path);
-    index.set_cluster_id_path(out_db_path);
-    index.finalize();
+    index.SetClusterVectorPath(out_db_path);
+    index.SetClusterIdPath(out_db_path);
+    index.Finalize();
 
     return 0;
 }

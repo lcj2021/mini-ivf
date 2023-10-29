@@ -17,7 +17,7 @@
 #include <omp.h>
 
 
-namespace Toy {
+namespace toy {
 
 /**
  * Configuration structure
@@ -65,25 +65,25 @@ class IndexIVFPQ {
 public:
     IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose);
 
-    void populate(const std::vector<float>& rawdata);
+    void Populate(const std::vector<float>& rawdata);
     void load_from_book(const std::vector<uint32_t>& book, std::string cluster_path);
-    void load_pq_codebook(std::string pq_codebook_path);
-    void load_cq_codebook(std::string cq_codebook_path);
-    void train(const std::vector<float>& rawdata, int seed, size_t nsamples = 0);
-    void load_index(std::string index_path);
-    void write_index(std::string index_path);
-    void finalize();
+    void LoadPqCodebook(std::string pq_codebook_path);
+    void LoadCqCodebook(std::string cq_codebook_path);
+    void Train(const std::vector<float>& rawdata, int seed, size_t nsamples = 0);
+    void LoadIndex(std::string index_path);
+    void WriteIndex(std::string index_path);
+    void Finalize();
 
     
     void
-    top_w_id(
+    TopWId(
         int w, 
         const std::vector<std::vector<float>>& queries,
         std::vector<std::vector<uint32_t>>& topw
     );
 
     void 
-    top_k_id(
+    TopKId(
         int k, 
         const std::vector<std::vector<float>>& queries, 
         const std::vector<std::vector<uint32_t>>& topw,
@@ -93,7 +93,7 @@ public:
     );
 
     // IVFPQ baseline
-    void query_baseline(
+    void QueryBaseline(
         const std::vector<float>& query,
         std::vector<size_t>& nnid,
         std::vector<float>& dist,
@@ -105,7 +105,7 @@ public:
     );
 
     // For observation
-    void query_obs(
+    void QueryObs(
         const std::vector<float>& query,
         const std::vector<int>& gt,
         std::vector<size_t>& nnid,
@@ -117,7 +117,7 @@ public:
     );
 
     // Write train set
-    void query_exhausted(
+    void QueryExhausted(
         const std::vector<float>& query,
         const std::vector<int>& gt,
         std::vector<size_t>& nnid,
@@ -128,31 +128,31 @@ public:
         int id
     );
 
-    void set_cluster_vector_path(std::string cluster_vector_path);
+    void SetClusterVectorPath(std::string cluster_vector_path);
 
-    void set_cluster_id_path(std::string cluster_id_path);
+    void SetClusterIdPath(std::string cluster_id_path);
 
-    void set_trainset_path(std::string trainset_path, int trainset_type);
+    void SetTrainsetPath(std::string trainset_path, int trainset_type);
 
-    void show_statistics();
+    void ShowStatistics();
 
 private:
-    void write_trainset();
-    void write_cluster_vector();
-    void write_cluster_id();
+    void SriteTrainset();
+    void WriteClusterVector();
+    void WriteClusterId();
 
-    void insert_ivf(const std::vector<float>& rawdata);
+    void InsertIvf(const std::vector<float>& rawdata);
     DistanceTable DTable(const std::vector<float>& vec) const;
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
     float ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const;
 
-    std::vector<uint8_t> get_single_code(size_t list_no, size_t offset) const;
+    std::vector<uint8_t> GetSingleCode(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
     template<typename T>
-    const std::vector<T> nth_raw_vector(const std::vector<T>& long_code, size_t n) const;
+    const std::vector<T> NthRawVector(const std::vector<T>& long_code, size_t n) const;
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    uint8_t nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, size_t m) const;
-    uint8_t nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const;
+    uint8_t NthVectorMthElement(const std::vector<uint8_t>& long_code, size_t n, size_t m) const;
+    uint8_t NthVectorMthElement(size_t list_no, size_t offset, size_t m) const;
     // Member variables
     size_t N_, D_, L_, nq, kc, kp, mc, mp, dc, dp;
     bool verbose_, is_trained_;
@@ -174,7 +174,7 @@ private:
 };
 
 
-} // namespace Toy
+} // namespace toy
 
 
 #endif

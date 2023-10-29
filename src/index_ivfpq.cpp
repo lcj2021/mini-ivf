@@ -2,7 +2,7 @@
 
 #include <unordered_set>
 
-using namespace Toy;
+using namespace toy;
 
 extern "C" {
     void omp_init_lock(omp_lock_t *);
@@ -42,7 +42,7 @@ IndexIVFPQ::IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose)
 }
 
 void 
-IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, size_t nsamples)
+IndexIVFPQ::Train(const std::vector<float>& rawdata, int seed, size_t nsamples)
 {
     size_t Nt_ = rawdata.size() / D_;
     if (nsamples < 100'000) nsamples = 100'000;
@@ -80,9 +80,9 @@ IndexIVFPQ::train(const std::vector<float>& rawdata, int seed, size_t nsamples)
 }
 
 void 
-IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
+IndexIVFPQ::InsertIvf(const std::vector<float>& rawdata)
 {
-    const auto& pqcodes = pq_->encode(rawdata);
+    const auto& pqcodes = pq_->Encode(rawdata);
 
     std::vector<omp_lock_t> locks(kc);
 
@@ -92,7 +92,7 @@ IndexIVFPQ::insert_ivf(const std::vector<float>& rawdata)
 
     #pragma omp parallel for
     for (size_t n = 0; n < N_; ++n) {
-        const auto& vec = nth_raw_vector(rawdata, n);
+        const auto& vec = NthRawVector(rawdata, n);
         int id = cq_->predict_one(vec, 0);
         omp_set_lock(&locks[id]);
         posting_lists_[id].emplace_back(n);
@@ -142,8 +142,8 @@ IndexIVFPQ::load_from_book(const std::vector<uint32_t>& book, std::string cluste
     }
 
     for (const auto& id : new_book_set) {
-        load_from_file_binary<uint32_t>(posting_lists_[id], cluster_path + prefix_id + std::to_string(id) + suffix_id);
-        load_from_file_binary<uint8_t>(db_codes_[id], cluster_path + prefix_vector + std::to_string(id) + suffix_vector);
+        LoadFromFileBinary<uint32_t>(posting_lists_[id], cluster_path + prefix_id + std::to_string(id) + suffix_id);
+        LoadFromFileBinary<uint8_t>(db_codes_[id], cluster_path + prefix_vector + std::to_string(id) + suffix_vector);
     }
 
     if (verbose_) {
@@ -152,7 +152,7 @@ IndexIVFPQ::load_from_book(const std::vector<uint32_t>& book, std::string cluste
 }
 
 void 
-IndexIVFPQ::load_cq_codebook(std::string cq_codebook_path)
+IndexIVFPQ::LoadCqCodebook(std::string cq_codebook_path)
 {
     if (verbose_) { std::cout << "Start to load cq codebook" << std::endl; }
 
@@ -163,14 +163,14 @@ IndexIVFPQ::load_cq_codebook(std::string cq_codebook_path)
     std::string cq_suffix = "cq_";
 
     cq_ = std::make_unique<Quantizer::Quantizer>(D_, 200'000, mc, kc, true);
-    cq_->load(cq_codebook_path + cq_suffix);
+    cq_->Load(cq_codebook_path + cq_suffix);
 
     centers_cq_ = cq_->get_centroids()[0];      // Because mc == 1
     std::cerr << "CQ codebook loaded.\n";
 }
 
 void 
-IndexIVFPQ::load_pq_codebook(std::string pq_codebook_path)
+IndexIVFPQ::LoadPqCodebook(std::string pq_codebook_path)
 {
     if (verbose_) { std::cout << "Start to load pq codebook" << std::endl; }
 
@@ -183,14 +183,14 @@ IndexIVFPQ::load_pq_codebook(std::string pq_codebook_path)
      * @todo load should change the mp, kp from file. 
     */
     pq_ = std::make_unique<Quantizer::Quantizer>(D_, 200'000, mp, kp, true);
-    pq_->load(pq_codebook_path + pq_suffix);
+    pq_->Load(pq_codebook_path + pq_suffix);
 
     centers_pq_ = pq_->get_centroids();
     std::cerr << "PQ codebook loaded.\n";
 }
 
 void
-IndexIVFPQ::top_w_id(
+IndexIVFPQ::TopWId(
     int w, 
     const std::vector<std::vector<float>>& queries,
     std::vector<std::vector<uint32_t>>& topw
@@ -228,7 +228,7 @@ IndexIVFPQ::top_w_id(
 }
 
 void
-IndexIVFPQ::top_k_id(
+IndexIVFPQ::TopKId(
     int k, 
     const std::vector<std::vector<float>>& queries, 
     const std::vector<std::vector<uint32_t>>& topw, 
@@ -286,11 +286,11 @@ IndexIVFPQ::top_k_id(
 }
 
 void 
-IndexIVFPQ::populate(const std::vector<float>& rawdata)
+IndexIVFPQ::Populate(const std::vector<float>& rawdata)
 {
     assert(rawdata.size() / D_ == N_);
     if (!is_trained_ || centers_cq_.empty()) {
-        std::cerr << "Error. train() must be called before running populate(vecs=X).\n";
+        std::cerr << "Error. Train() must be called before running Populate(vecs=X).\n";
         throw;
     }
 
@@ -307,7 +307,7 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
     for (auto& code : db_codes_) {
         code.reserve(N_ / kc);  // Roughly malloc
     }
-    insert_ivf(rawdata);
+    InsertIvf(rawdata);
 
     if (verbose_) {
         std::cout << N_ << " new vectors are added." << std::endl;
@@ -315,32 +315,32 @@ IndexIVFPQ::populate(const std::vector<float>& rawdata)
 }
 
 void 
-IndexIVFPQ::load_index(std::string index_path)
+IndexIVFPQ::LoadIndex(std::string index_path)
 {
     if (index_path.back() != '/') {
         index_path += "/";
     }
 
-    load_cq_codebook(index_path);
-    load_pq_codebook(index_path);
+    LoadCqCodebook(index_path);
+    LoadPqCodebook(index_path);
 
     is_trained_ = true;
 }
 
 void
-IndexIVFPQ::write_index(std::string index_path)
+IndexIVFPQ::WriteIndex(std::string index_path)
 {
     if (index_path.back() != '/') {
         index_path += "/";
     }
     std::string cq_suffix = "cq_", pq_suffix = "pq_";
-    cq_->write(index_path + cq_suffix);
-    pq_->write(index_path + pq_suffix);
+    cq_->Write(index_path + cq_suffix);
+    pq_->Write(index_path + pq_suffix);
 }
 
 
 void
-IndexIVFPQ::query_baseline(
+IndexIVFPQ::QueryBaseline(
     const std::vector<float>& query,
     std::vector<size_t>& nnid,
     std::vector<float>& dist,
@@ -358,6 +358,7 @@ IndexIVFPQ::query_baseline(
         scores_coarse[no] = {no, fvec_L2sqr(query.data(), centers_cq_[no].data(), D_)};
     }
 
+    W = std::min(W, (int)kc);
     std::partial_sort(scores_coarse.begin(), scores_coarse.begin() + W, scores_coarse.end(),
         [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
             return a.second < b.second;
@@ -400,7 +401,7 @@ IndexIVFPQ::query_baseline(
 }
 
 void
-IndexIVFPQ::query_obs(
+IndexIVFPQ::QueryObs(
     const std::vector<float>& query,
     const std::vector<int>& gt,
     std::vector<size_t>& nnid,
@@ -460,7 +461,7 @@ IndexIVFPQ::query_obs(
 }
 
 void
-IndexIVFPQ::query_exhausted(
+IndexIVFPQ::QueryExhausted(
     const std::vector<float>& query,
     const std::vector<int>& gt,
     std::vector<size_t>& nnid,
@@ -508,7 +509,7 @@ IndexIVFPQ::query_exhausted(
         coarse_cnt++;
     }
     searched_cnt = scores.size();
-    topk = std::min(topk, (int)searched_cnt);
+    if (topk > searched_cnt) topk = searched_cnt;
     std::partial_sort(scores.begin(), scores.begin() + topk, scores.end(),
         [](const std::pair<size_t, float>& a, const std::pair<size_t, float>& b) {
             return a.second < b.second;
@@ -526,7 +527,7 @@ IndexIVFPQ::query_exhausted(
 
 
 void 
-IndexIVFPQ::write_trainset()
+IndexIVFPQ::SriteTrainset()
 {
     auto dataset_name = write_trainset_path_;
     if (dataset_name.back() != '/') {
@@ -541,16 +542,16 @@ IndexIVFPQ::write_trainset()
         throw;
     }
     std::string f_suffix = ".fvecs", i_suffix = ".ivecs";
-    // write_to_file_binary(L, {nq, kc}, dataset_name + prefix + "l" + f_suffix);
-    // write_to_file_binary(R, {nq, kc}, dataset_name + prefix + "r" + f_suffix);
-    // write_to_file_binary(Q, {nq, kc}, dataset_name + prefix + "q" + f_suffix);
-    // write_to_file_binary(queryraw_, {nq, D_}, dataset_name + prefix + "query" + f_suffix);
+    // WriteToFileBinary(L, {nq, kc}, dataset_name + prefix + "l" + f_suffix);
+    // WriteToFileBinary(R, {nq, kc}, dataset_name + prefix + "r" + f_suffix);
+    // WriteToFileBinary(Q, {nq, kc}, dataset_name + prefix + "q" + f_suffix);
+    // WriteToFileBinary(queryraw_, {nq, D_}, dataset_name + prefix + "query" + f_suffix);
 
-    // write_to_file_binary(radius_, {nq, kc}, dataset_name + prefix + "radius" + i_suffix);
+    // WriteToFileBinary(radius_, {nq, kc}, dataset_name + prefix + "radius" + i_suffix);
 }
 
 void 
-IndexIVFPQ::write_cluster_vector()
+IndexIVFPQ::WriteClusterVector()
 {
     auto dataset_name = write_cluster_vector_path_;
     if (dataset_name.back() != '/') {
@@ -562,15 +563,15 @@ IndexIVFPQ::write_cluster_vector()
     for (size_t no = 0; no < kc; ++no) {
         size_t posting_lists_len = posting_lists_[no].size();
         auto cluster_vector_name = dataset_name + prefix + std::to_string(no) + ui8_suffix;
-        write_to_file_binary(db_codes_[no], {posting_lists_len, mp}, cluster_vector_name);
+        WriteToFileBinary(db_codes_[no], {posting_lists_len, mp}, cluster_vector_name);
         posting_lists_lens[no] = posting_lists_len;
     }
 
-    write_to_file_binary(posting_lists_lens, {1, kc}, dataset_name + "posting_lists_lens" + ul_suffix);
+    WriteToFileBinary(posting_lists_lens, {1, kc}, dataset_name + "posting_lists_lens" + ul_suffix);
 }
 
 void 
-IndexIVFPQ::write_cluster_id()
+IndexIVFPQ::WriteClusterId()
 {
     auto dataset_name = write_cluster_id_path_;
     if (dataset_name.back() != '/') {
@@ -581,28 +582,28 @@ IndexIVFPQ::write_cluster_id()
     for (size_t no = 0; no < kc; ++no) {
         size_t posting_lists_len = posting_lists_[no].size();
         auto cluster_id_name = dataset_name + prefix + std::to_string(no) + ui_suffix;
-        write_to_file_binary(posting_lists_[no], {1, posting_lists_len}, cluster_id_name);
+        WriteToFileBinary(posting_lists_[no], {1, posting_lists_len}, cluster_id_name);
     }
 }
 
 void
-IndexIVFPQ::finalize()
+IndexIVFPQ::Finalize()
 {
     if (write_trainset_path_ != "") {
-        write_trainset();
+        SriteTrainset();
     }
 
     if (write_cluster_vector_path_ != "") {
-        write_cluster_vector();
+        WriteClusterVector();
     }
 
     if (write_cluster_id_path_ != "") {
-        write_cluster_id();
+        WriteClusterId();
     }
 }
 
 void 
-IndexIVFPQ::show_statistics()
+IndexIVFPQ::ShowStatistics()
 {
 
 }
@@ -641,14 +642,14 @@ IndexIVFPQ::ADist(const DistanceTable& dtable, size_t list_no, size_t offset) co
 {
     float dist = 0;
     for (size_t m = 0; m < mp; ++m) {
-        uint8_t ks = nth_vector_mth_element(list_no, offset, m);
+        uint8_t ks = NthVectorMthElement(list_no, offset, m);
         dist += dtable.get_value(m, ks);
     }
     return dist;
 }
 
 std::vector<uint8_t> 
-IndexIVFPQ::get_single_code(size_t list_no, size_t offset) const
+IndexIVFPQ::GetSingleCode(size_t list_no, size_t offset) const
 {
     return std::vector<uint8_t>(db_codes_[list_no].begin() + offset * mp, 
                             db_codes_[list_no].begin() + (offset + 1) * mp);
@@ -656,34 +657,34 @@ IndexIVFPQ::get_single_code(size_t list_no, size_t offset) const
 
 template<typename T>
 const std::vector<T> 
-IndexIVFPQ::nth_raw_vector(const std::vector<T>& long_code, size_t n) const
+IndexIVFPQ::NthRawVector(const std::vector<T>& long_code, size_t n) const
 {
     return std::vector<T>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 uint8_t 
-IndexIVFPQ::nth_vector_mth_element(const std::vector<uint8_t>& long_code, size_t n, size_t m) const
+IndexIVFPQ::NthVectorMthElement(const std::vector<uint8_t>& long_code, size_t n, size_t m) const
 {
     return long_code[ n * mp + m];
 }
 
 uint8_t 
-IndexIVFPQ::nth_vector_mth_element(size_t list_no, size_t offset, size_t m) const
+IndexIVFPQ::NthVectorMthElement(size_t list_no, size_t offset, size_t m) const
 {
     return db_codes_[list_no][ offset * mp + m];
 }
 
-void IndexIVFPQ::set_cluster_vector_path(std::string cluster_vector_path) 
+void IndexIVFPQ::SetClusterVectorPath(std::string cluster_vector_path) 
 {
     write_cluster_vector_path_ = cluster_vector_path;
 }
 
-void IndexIVFPQ::set_cluster_id_path(std::string cluster_id_path) 
+void IndexIVFPQ::SetClusterIdPath(std::string cluster_id_path) 
 {
     write_cluster_id_path_ = cluster_id_path;
 }
 
-void IndexIVFPQ::set_trainset_path(std::string trainset_path, int trainset_type)
+void IndexIVFPQ::SetTrainsetPath(std::string trainset_path, int trainset_type)
 {
     write_trainset_path_ = trainset_path;
     write_trainset_type_ = trainset_type;

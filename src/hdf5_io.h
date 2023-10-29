@@ -55,7 +55,7 @@ void write_to_file_hdf5(const std::vector<T>& data, std::pair<size_t, size_t> di
         hsize_t dims[2] = {dimension.first, dimension.second};
         H5::DataSpace dataspace(2, dims);
         H5::DataSet dataset = file.createDataSet(dataset_name, get_hdf5_datatype<T>(), dataspace);
-        dataset.write(&data[0], get_hdf5_datatype<T>());
+        dataset.Write(&data[0], get_hdf5_datatype<T>());
         printf("%s[%s]: [%llu x %llu] has written!\n", filename.data(), dataset_name.data(), dims[0], dims[1]);
     } catch (const H5::Exception& e) {
         std::cerr << "Exception caught: " << e.getDetailMsg() << std::endl;
