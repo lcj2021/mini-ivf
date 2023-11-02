@@ -79,7 +79,8 @@ public:
     TopWId(
         int w, 
         const std::vector<std::vector<float>>& queries,
-        std::vector<std::vector<uint32_t>>& topw
+        std::vector<std::vector<uint32_t>>& topw, 
+        int num_threads
     );
 
     void 

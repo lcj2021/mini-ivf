@@ -24,7 +24,7 @@ foreach(TEST_SOURCE ${TEST_SOURCES})
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     target_link_libraries(${TEST_NAME} PUBLIC toy)
     target_compile_options(${TEST_NAME} PUBLIC 
-            -O3
+            -Ofast
             -march=native
             -mtune=native
     )

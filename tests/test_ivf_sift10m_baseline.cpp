@@ -12,7 +12,7 @@ size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt = 1000'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t nq = 1'000;
-int ncentroids = 4'000;
+int ncentroids = 16384;
 
 std::string suffix = "nt" + ToStringWithUnits(nt) 
                     + "_kc" + std::to_string(ncentroids);
@@ -44,14 +44,14 @@ int main(int argc, char* argv[]) {
         index_path, db_path
     );
     toy::IndexIVF index(cfg, nq, true);
-    index.Train(database, 123, nt);
-    index.WriteIndex(index_path);
+    // index.Train(database, 123, nt);
+    // index.WriteIndex(index_path);
     index.LoadIndex(index_path);
     index.Populate(database);
 
     puts("Index find kNN!");
     // Recall@k
-    int k = 100;
+    int k = 10;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;

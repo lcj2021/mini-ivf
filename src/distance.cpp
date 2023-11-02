@@ -1,26 +1,9 @@
-#ifndef DISTANCE_H
-#define DISTANCE_H
+#include "distance.hpp"
 
-// http://koturn.hatenablog.com/entry/2016/07/18/090000
-// windows is not supported, but just in case (later someone might implement)
-// https://software.intel.com/sites/landingpage/IntrinsicsGuide/#expand=590,27,2
-#ifdef _MSC_VER
-#  include <immintrin.h> 
-#else
-#  include <x86intrin.h>
-#endif
+#include <cassert>
 
-// These fast L2 squared distance codes (SSE and AVX) are from the Faiss library:
-// https://github.com/facebookresearch/faiss/blob/master/utils.cpp
-//
-// Based on them, AVX512 implementation is also prepared.
-// But it doesn't seem drastically fast. Only slightly faster than AVX:
-// (runtime) REF >> SSE >= AVX ~ AVX512
 
-namespace {
 
-// From Faiss.
-// Reference implementation
 float fvec_L2sqr_ref(const float *x, const float *y, size_t d)
 {
     size_t i;
@@ -79,6 +62,7 @@ static inline __m256 masked_read_8 (int d, const float *x)
         return res;
     }
 }
+
 #endif // __AVX__
 
 
@@ -108,7 +92,6 @@ static inline __m512 masked_read_16 (int d, const float *x)
 // ========================= Distance functions ============================
 
 #if defined(__AVX512F__)  
-static const std::string g_simd_architecture = "avx512";
 
 // AVX512 implementation by Yusuke
 float fvec_L2sqr (const float *x, const float *y, size_t d)
@@ -167,7 +150,6 @@ float fvec_L2sqr (const float *x, const float *y, size_t d)
 }
 
 #elif defined (__AVX__)  
-static const std::string g_simd_architecture = "avx";
 
 // This function is from Faiss
 // AVX implementation
@@ -214,8 +196,6 @@ float fvec_L2sqr (const float *x, const float *y, size_t d)
 }
 
 #else 
-static const std::string g_simd_architecture = "sse";
-
 
 // This function is from Faiss
 // SSE implementation. Unroot!
@@ -252,8 +232,3 @@ float fvec_L2sqr(const float *x, const float *y, size_t d)
 #endif
 
 
-
-
-} // namespace toy
-
-#endif // DISTANCE_H

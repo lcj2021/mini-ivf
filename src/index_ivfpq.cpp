@@ -193,7 +193,8 @@ void
 IndexIVFPQ::TopWId(
     int w, 
     const std::vector<std::vector<float>>& queries,
-    std::vector<std::vector<uint32_t>>& topw
+    std::vector<std::vector<uint32_t>>& topw, 
+    int num_threads
 )
 {
     if (cq_ == nullptr) {
@@ -203,6 +204,7 @@ IndexIVFPQ::TopWId(
     
     topw.resize(queries.size(), std::vector<uint32_t>(w));
 
+    #pragma omp parallel for num_threads(num_threads)
     for (size_t n = 0; n < queries.size(); ++n) {
         const auto& query = queries[n];
         assert(query.size() == D_);
@@ -628,13 +630,141 @@ IndexIVFPQ::DTable(const std::vector<float>& vec) const
 float 
 IndexIVFPQ::ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const
 {
-    assert(code.size() == mp);
+    // assert(code.size() == mp);
+    // float dist = 0;
+    // for (size_t m = 0; m < mp; ++m) {
+    //     uint8_t ks = code[m];
+    //     dist += dtable.get_value(m, ks);
+    // }
+    // return dist;
     float dist = 0;
-    for (size_t m = 0; m < mp; ++m) {
+    size_t m = 0;
+    for (; m + 8 <= mp; m += 8) {
+        uint8_t ks1 = code[m];
+        uint8_t ks2 = code[m + 1];
+        uint8_t ks3 = code[m + 2];
+        uint8_t ks4 = code[m + 3];
+        uint8_t ks5 = code[m + 4];
+        uint8_t ks6 = code[m + 5];
+        uint8_t ks7 = code[m + 6];
+        uint8_t ks8 = code[m + 7];
+
+        dist += dtable.get_value(m, ks1);
+        dist += dtable.get_value(m + 1, ks2);
+        dist += dtable.get_value(m + 2, ks3);
+        dist += dtable.get_value(m + 3, ks4);
+        dist += dtable.get_value(m + 4, ks5);
+        dist += dtable.get_value(m + 5, ks6);
+        dist += dtable.get_value(m + 6, ks7);
+        dist += dtable.get_value(m + 7, ks8);
+    }
+
+    // Handle the remaining iterations, if any
+    for (; m < mp; ++m) {
         uint8_t ks = code[m];
         dist += dtable.get_value(m, ks);
     }
+
     return dist;
+
+
+    /// unroll
+    // assert(code.size() == mp);
+    // const char unroll = 2;
+    // float dist = 0;
+    // size_t m = mp - 1;
+
+    // switch (unroll)
+    // {
+    // case 0x01:
+    // {
+    //     for (size_t i = 0; i < mp; i++) {
+    //         dist += dtable.get_value(i, code[i]);
+    //     }
+    // }
+    // break;
+    // case 0x02:
+    // {
+    //     /// unrolling the loop every 4 iterations.
+    //     while (m >= 2) {
+    //         float dist1 = dtable.get_value(m, code[m]);
+    //         float dist2 = dtable.get_value(m - 1, code[m - 1]);
+    //         dist += dist1 + dist2;
+    //         m -= 2;
+    //     }
+    //     for (size_t i = 0; i <= m; i++) {
+    //         dist += dtable.get_value(i, code[i]);
+    //     }
+    // }
+    // break;
+    // case 0x03:
+    // {
+    //     /// unrolling the loop every 3 iterations.
+    //     while (m >= 3) {
+    //         float dist1 = dtable.get_value(m, code[m]);
+    //         float dist2 = dtable.get_value(m - 1, code[m - 1]);
+    //         float dist3 = dtable.get_value(m - 2, code[m - 2]);
+    //         dist += dist1 + dist2 + dist3;
+    //         m -= 3;
+    //     }
+    //     for (size_t i = 0; i <= m; i++) {
+    //         dist += dtable.get_value(i, code[i]);
+    //     }
+    // }
+    // break;
+    // case 0x04:
+    // {
+    //     /// unrolling the loop every 4 iterations.
+    //     while (m >= 4) {
+    //         float dist1 = dtable.get_value(m, code[m]);
+    //         float dist2 = dtable.get_value(m - 1, code[m - 1]);
+    //         float dist3 = dtable.get_value(m - 2, code[m - 2]);
+    //         float dist4 = dtable.get_value(m - 3, code[m - 3]);
+    //         dist += dist1 + dist2 + dist3 + dist4;
+    //         m -= 4;
+    //     }
+    //     for (size_t i = 0; i <= m; i++) {
+    //         dist += dtable.get_value(i, code[i]);
+    //     }
+    // }
+    // case 0x08:
+    // {
+    //     /// unrolling the loop every 8 iterations.
+    //     while (m >= 8) {
+    //         float dist1 = dtable.get_value(m, code[m]);
+    //         float dist2 = dtable.get_value(m - 1, code[m - 1]);
+    //         float dist3 = dtable.get_value(m - 2, code[m - 2]);
+    //         float dist4 = dtable.get_value(m - 3, code[m - 3]);
+    //         float dist5 = dtable.get_value(m - 4, code[m - 4]);
+    //         float dist6 = dtable.get_value(m - 5, code[m - 5]);
+    //         float dist7 = dtable.get_value(m - 6, code[m - 6]);
+    //         float dist8 = dtable.get_value(m - 7, code[m - 7]);
+    //         dist += dist1 + dist2 + dist3 + dist4 + dist5 + dist6 + dist7 + dist8;
+    //         m -= 8;
+    //     }
+    //     for (size_t i = 0; i <= m; i++) {
+    //         dist += dtable.get_value(i, code[i]);
+    //     }
+    // }
+    // break;
+    // default:
+    //     std::cerr << "Error: invalid unroll degree." << std::endl;
+    //     exit(1);
+    // }
+    // /// unrolling the loop every 4 iterations.
+    // while (m >= 4) {
+    //     float dist1 = dtable.get_value(m, code[m]);
+    //     float dist2 = dtable.get_value(m - 1, code[m - 1]);
+    //     float dist3 = dtable.get_value(m - 2, code[m - 2]);
+    //     float dist4 = dtable.get_value(m - 3, code[m - 3]);
+    //     dist += dist1 + dist2 + dist3 + dist4;
+    //     m -= 4;
+    // }
+    // for (size_t i = 0; i <= m; i++) {
+    //     dist += dtable.get_value(i, code[i]);
+    // }
+
+    // return dist;
 }
 
 float 

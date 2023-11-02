@@ -10,10 +10,10 @@
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
-size_t nt = 200'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t nt = 1'000'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 1'000;
-int ncentroids = 1;
+int ncentroids = 4096;
 
 std::string suffix = "nt" + ToStringWithUnits(nt)
                     + "_kc" + std::to_string(ncentroids);

@@ -10,10 +10,10 @@
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
-size_t nt = 200'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t nt = 1'000'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t mp = 128;
 size_t nq = 1'000;
-int ncentroids = 1'000;
+int ncentroids = 4096;
 
 std::string suffix = "nt" + ToStringWithUnits(nt) 
                     + "_pq" + std::to_string(mp)
@@ -49,8 +49,10 @@ int main(int argc, char* argv[]) {
     // std::vector<uint32_t> book(ncentroids);
     // std::iota(book.begin(), book.end(), (uint32_t)0);
     // index.load_from_book(book, "/home/anns/dataset/sift1m/" + suffix);
-    index.Train(database, 123, true);
+    
+    // index.Train(database, 123, true);
     // index.WriteIndex(index_path);
+    index.LoadIndex(index_path);
     index.Populate(database);
 
     puts("Index find kNN!");

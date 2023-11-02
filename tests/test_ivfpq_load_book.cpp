@@ -58,7 +58,7 @@ int main() {
     query.resize(nq * D);
     auto nested_queries = nest_2d(query, {nq, D});
     std::vector<std::vector<uint32_t>> topw;
-    index.TopWId(50, nested_queries, topw);
+    index.TopWId(50, nested_queries, topw, 16);
     for (size_t n = 0; n < nq; ++n) {
         std::cerr << "Query " << n << " :\n";
         for (const auto& id : topw[n]) {
