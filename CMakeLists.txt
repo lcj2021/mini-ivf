@@ -2,7 +2,7 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
 
 PROJECT(Toy)
 
-SET(CMAKE_CXX_STANDARD 17)
+SET(CMAKE_CXX_STANDARD 20)
 
 SET(TOY_ROOT ${CMAKE_SOURCE_DIR})
 
@@ -28,7 +28,13 @@ INCLUDE_DIRECTORIES(${TOY_ROOT}/include)
 ADD_LIBRARY(
     toy 
     SHARED  
-    ${TOY_SRC}
+    # ${TOY_SRC}
+    ${TOY_ROOT}/src/index_ivf.cpp
+    ${TOY_ROOT}/src/index_ivfpq.cpp
+    ${TOY_ROOT}/src/distance.cpp
+    ${TOY_ROOT}/include/kmeans.hpp
+    ${TOY_ROOT}/src/quantizer.cpp
+    ${TOY_ROOT}/src/util.cpp
 )
 
 target_include_directories(toy PUBLIC
@@ -53,4 +59,4 @@ TARGET_LINK_LIBRARIES(
 
 # ADD_SUBDIRECTORY(src)
 ADD_SUBDIRECTORY(tests)
-ADD_SUBDIRECTORY(toolkits)
+# ADD_SUBDIRECTORY(toolkits)

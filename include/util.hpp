@@ -1,10 +1,40 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-#include <chrono>
-#include <vector>
 #include <cassert>
+#include <chrono>
+#include <iostream>
 #include <string>
+#include <typeinfo>
+#include <vector>
+
+template<typename T>  
+#define PRINT_VAR_INFO(var) do { \
+    std::cout << "Variable Name: " << #var << std::endl; \
+    std::cout << "Variable Type: "; \
+    PrintType(var); \
+} while (0);
+
+void PrintType(const T& var) {  
+    if (std::is_same<T, int>::value) {  
+        std::cout << "int" << std::endl;  
+    } else if (std::is_same<T, uint8_t>::value) {  
+        std::cout << "uint8_t" << std::endl;  
+    } else if (std::is_same<T, uint16_t>::value) {  
+        std::cout << "uint16_t" << std::endl;  
+    } else if (std::is_same<T, uint32_t>::value) {  
+        std::cout << "uint32_t" << std::endl;  
+    } else if (std::is_same<T, float>::value) {  
+        std::cout << "float" << std::endl;  
+    } else if (std::is_same<T, double>::value) {  
+        std::cout << "double" << std::endl;  
+    } else if (std::is_same<T, std::string>::value) {  
+        std::cout << "std::string" << std::endl;  
+    } // else if ... 
+    else {  
+        std::cout << typeid(T).name() << std::endl;  
+    }  
+}  
 
 class Timer
 {

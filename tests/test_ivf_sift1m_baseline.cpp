@@ -41,15 +41,15 @@ int main(int argc, char* argv[]) {
         ncentroids, 1, D, 
         index_path, db_path
     );
-    toy::IndexIVF index(cfg, nq, true);
-    index.Train(database, 123, true);
-    // index.WriteIndex(index_path);
-    // index.LoadIndex(index_path);
+    toy::IndexIVF<float> index(cfg, nq, true);
+    index.Train(database, 123, nt);
+    index.WriteIndex(index_path);
+    index.LoadIndex(index_path);
     index.Populate(database);
 
     puts("Index find kNN!");
     // Recall@k
-    int k = 100;
+    int k = 10;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;

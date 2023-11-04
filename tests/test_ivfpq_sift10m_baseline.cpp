@@ -10,10 +10,10 @@
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
-size_t nt = 200'000;         // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 128;
+size_t nt = 1'000'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t mp = 64;
 size_t nq = 1'000;
-int ncentroids = 1'000;
+int ncentroids = 16384;
 
 std::string suffix = "nt" + ToStringWithUnits(nt) 
                     + "_pq" + std::to_string(mp)
@@ -26,14 +26,14 @@ std::string query_path = "/dk/anns/query/sift10m";
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
-    std::vector<float> database;
-    std::tie(nb, D) = LoadFromFileBinary<float>(database, db_path + "/base.fvecs");
+    std::vector<uint8_t> database;
+    std::tie(nb, D) = LoadFromFileBinary<uint8_t>(database, db_path + "/base.bvecs");
 
-    std::vector<float> query;
-    LoadFromFileBinary<float>(query, db_path + "/query.fvecs");
+    std::vector<uint8_t> query;
+    LoadFromFileBinary<uint8_t>(query, query_path + "/query.bvecs");
 
     std::vector<int> gt;
-    LoadFromFileBinary<int>(gt, db_path + "/query_groundtruth.ivecs");
+    auto [n_gt, d_gt] = LoadFromFileBinary<int>(gt, query_path + "/gt.ivecs");
 
     int nprobe = std::atoi(argv[1]);
 
@@ -44,18 +44,19 @@ int main(int argc, char* argv[]) {
         D, D / mp, 
         index_path, db_path
     );
-    toy::IndexIVFPQ index(cfg, nq, true);
-    // index.LoadIndex(index_path);
+    toy::IndexIVFPQ<uint8_t> index(cfg, nq, true);
     // std::vector<uint32_t> book(ncentroids);
     // std::iota(book.begin(), book.end(), (uint32_t)0);
-    // index.load_from_book(book, "/home/anns/dataset/sift10m/" + suffix);
-    index.Train(database, 123, true);
+    // index.LoadFromBook(book, "/home/anns/dataset/sift10m/" + suffix);
+
+    // index.Train(database, 123, nt);
     // index.WriteIndex(index_path);
+    index.LoadIndex(index_path);
     index.Populate(database);
 
     puts("Index find kNN!");
     // Recall@k
-    int k = 100;
+    int k = 10;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
@@ -66,7 +67,7 @@ int main(int argc, char* argv[]) {
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.QueryBaseline(
-            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+            std::vector<uint8_t>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
              k, nb, q, nprobe
         );
@@ -79,7 +80,7 @@ int main(int argc, char* argv[]) {
 
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {
-        std::unordered_set<int> S(gt.begin() + q * 100, gt.begin() + q * 100 + k);
+        std::unordered_set<int> S(gt.begin() + q * d_gt, gt.begin() + q * d_gt + k);
         for (int i = 0; i < k; ++i)
             if (S.count(nnid[q][i]))
                 n_ok++;

@@ -10,9 +10,9 @@
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
-size_t nt = 1000'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t nt = 1'000'000;         // make a set of nt training vectors in the unit cube (could be the database)
 size_t nq = 1'000;
-int ncentroids = 10'000;
+int ncentroids = 16384;
 
 std::string suffix = "nt" + ToStringWithUnits(nt) 
                     + "_kc" + std::to_string(ncentroids);
@@ -24,10 +24,10 @@ std::string query_path = "/dk/anns/query/sift100m";
 
 int main(int argc, char* argv[]) {
     assert(argc == 2);
-    std::vector<float> database;
+    std::vector<uint8_t> database;
     std::tie(nb, D) = LoadFromFileBinary<uint8_t>(database, db_path + "/base.bvecs");
 
-    std::vector<float> query;
+    std::vector<uint8_t> query;
     LoadFromFileBinary<uint8_t>(query, query_path + "/query.bvecs");
 
     std::vector<int> gt;
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
         ncentroids, 1, D, 
         index_path, db_path
     );
-    toy::IndexIVF index(cfg, nq, true);
+    toy::IndexIVF<uint8_t> index(cfg, nq, true);
     // index.Train(database, 123, nt);
     // index.WriteIndex(index_path);
     index.LoadIndex(index_path);
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
 
     puts("Index find kNN!");
     // Recall@k
-    int k = 100;
+    int k = 10;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.QueryBaseline(
-            std::vector<float>(query.begin() + q * D, query.begin() + (q + 1) * D), 
+            std::vector<uint8_t>(query.begin() + q * D, query.begin() + (q + 1) * D), 
             nnid[q], dist[q], searched_cnt, 
              k, nb, q, nprobe
         );

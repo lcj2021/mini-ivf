@@ -33,8 +33,8 @@ int main() {
         ncentroids, 1, D, 
         index_path, db_path
     );
-    toy::IndexIVF index(cfg, nq, true);
-    index.Train(database, 123, true);
+    toy::IndexIVF<float> index(cfg, nq, true);
+    index.Train(database, 123, nt);
     index.Populate(database);
 
     puts("Index find kNN!");

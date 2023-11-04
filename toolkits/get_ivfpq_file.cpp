@@ -49,7 +49,7 @@ int main() {
         D, D / mp, 
         index_path, out_db_path
     );
-    toy::IndexIVFPQ index(cfg, nq, true);
+    toy::IndexIVFPQ<float> index(cfg, nq, true);
 
     index.Train(database, 123, nt);
     index.WriteIndex(index_path);

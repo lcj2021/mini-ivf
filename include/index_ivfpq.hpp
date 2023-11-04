@@ -61,15 +61,15 @@ struct DistanceTable {
     std::vector<float> data_;
 };
 
-class IndexIVFPQ {
+template <typename T> class IndexIVFPQ {
 public:
     IndexIVFPQ(const IVFPQConfig& cfg, size_t nq, bool verbose);
 
-    void Populate(const std::vector<float>& rawdata);
-    void load_from_book(const std::vector<uint32_t>& book, std::string cluster_path);
+    void Populate(const std::vector<T>& rawdata);
+    void LoadFromBook(const std::vector<uint32_t>& book, std::string cluster_path);
     void LoadPqCodebook(std::string pq_codebook_path);
     void LoadCqCodebook(std::string cq_codebook_path);
-    void Train(const std::vector<float>& rawdata, int seed, size_t nsamples = 0);
+    void Train(const std::vector<T>& rawdata, int seed, size_t nsamples = 0);
     void LoadIndex(std::string index_path);
     void WriteIndex(std::string index_path);
     void Finalize();
@@ -78,7 +78,7 @@ public:
     void
     TopWId(
         int w, 
-        const std::vector<std::vector<float>>& queries,
+        const std::vector<std::vector<T>>& queries,
         std::vector<std::vector<uint32_t>>& topw, 
         int num_threads
     );
@@ -86,7 +86,7 @@ public:
     void 
     TopKId(
         int k, 
-        const std::vector<std::vector<float>>& queries, 
+        const std::vector<std::vector<T>>& queries, 
         const std::vector<std::vector<uint32_t>>& topw,
         std::vector<std::vector<uint32_t>>& topk_id,
         std::vector<std::vector<float>>& topk_dist,
@@ -95,7 +95,7 @@ public:
 
     // IVFPQ baseline
     void QueryBaseline(
-        const std::vector<float>& query,
+        const std::vector<T>& query,
         std::vector<size_t>& nnid,
         std::vector<float>& dist,
         size_t& searched_cnt,
@@ -107,19 +107,7 @@ public:
 
     // For observation
     void QueryObs(
-        const std::vector<float>& query,
-        const std::vector<int>& gt,
-        std::vector<size_t>& nnid,
-        std::vector<float>& dist,
-        size_t& searched_cnt,
-        int topk,
-        int L,
-        int id
-    );
-
-    // Write train set
-    void QueryExhausted(
-        const std::vector<float>& query,
+        const std::vector<T>& query,
         const std::vector<int>& gt,
         std::vector<size_t>& nnid,
         std::vector<float>& dist,
@@ -138,22 +126,18 @@ public:
     void ShowStatistics();
 
 private:
-    void SriteTrainset();
+    void WriteTrainset();
     void WriteClusterVector();
     void WriteClusterId();
 
-    void InsertIvf(const std::vector<float>& rawdata);
-    DistanceTable DTable(const std::vector<float>& vec) const;
+    void InsertIvf(const std::vector<T>& rawdata);
+    DistanceTable DTable(const std::vector<T>& vec) const;
     float ADist(const DistanceTable& dtable, const std::vector<uint8_t>& code) const;
     float ADist(const DistanceTable& dtable, size_t list_no, size_t offset) const;
 
-    std::vector<uint8_t> GetSingleCode(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
-    template<typename T>
-    const std::vector<T> NthRawVector(const std::vector<T>& long_code, size_t n) const;
-    // Given a long (N * M) codes, pick up m-th element from n-th code
-    uint8_t NthVectorMthElement(const std::vector<uint8_t>& long_code, size_t n, size_t m) const;
-    uint8_t NthVectorMthElement(size_t list_no, size_t offset, size_t m) const;
+    const T* NthRawVector(const T* long_code_ptr, size_t n) const;
+
     // Member variables
     size_t N_, D_, L_, nq, kc, kp, mc, mp, dc, dp;
     bool verbose_, is_trained_;
@@ -161,7 +145,7 @@ private:
     std::string write_trainset_path_, write_cluster_vector_path_, write_cluster_id_path_;
     int write_trainset_type_;
 
-    std::unique_ptr<Quantizer::Quantizer> cq_, pq_;
+    std::unique_ptr<Quantizer::Quantizer<T>> cq_, pq_;
 
     std::vector<std::vector<float>> centers_cq_;
     std::vector<int> labels_cq_;

@@ -47,7 +47,7 @@ int main() {
             database_flat[i * D + j] = database[i][j];
         }
     }
-    toy::IndexIVF index(cfg, nq, true);
+    toy::IndexIVF<float> index(cfg, nq, true);
     index.Train(database_flat, 123, false);
     index.Populate(database_flat);
     // index.Reconfigure(ncentroids, 5);

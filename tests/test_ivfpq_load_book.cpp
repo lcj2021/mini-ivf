@@ -40,16 +40,16 @@ int main() {
         D, D / mp, 
         index_path, db_path
     );
-    toy::IndexIVFPQ index(cfg, nq, true);
-    // index.Train(database, 123, true);
+    toy::IndexIVFPQ<float> index(cfg, nq, true);
+    // index.Train(database, 123, nt);
     // index.WriteIndex(index_path);
     // index.LoadIndex(index_path);
     // index.Populate(database);
     std::vector<uint32_t> book{0, 2, 4, 67, 21, 123, 321, 234, 567, 764, 232};
-    index.load_from_book(book, db_path + "/sift1m_pq128_kc1000_cluster");
+    index.LoadFromBook(book, db_path + "/sift1m_pq128_kc1000_cluster");
 
     std::iota(book.begin(), book.end(), (uint32_t)0);
-    index.load_from_book(book, db_path + "/sift1m_pq128_kc1000_cluster");
+    index.LoadFromBook(book, db_path + "/sift1m_pq128_kc1000_cluster");
 
 
     index.LoadPqCodebook(db_path + "/sift1m_pq128_kc1000_cluster");

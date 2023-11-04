@@ -40,20 +40,20 @@ struct IVFConfig {
     );
 };
 
-class IndexIVF {
+template <typename T> class IndexIVF {
 public:
     IndexIVF(const IVFConfig& cfg, size_t nq, bool verbose);
 
-    void Populate(const std::vector<float>& rawdata);
+    void Populate(const std::vector<T>& rawdata);
     void LoadCqCodebook(std::string cq_codebook_path);
-    void Train(const std::vector<float>& rawdata, int seed, size_t nsamples);
+    void Train(const std::vector<T>& rawdata, int seed, size_t nsamples);
     void LoadIndex(std::string index_path);
     void WriteIndex(std::string index_path);
 
     // IVF baseline
     void
     QueryBaseline(
-        const std::vector<float>& query,
+        const std::vector<T>& query,
         std::vector<size_t>& nnid,
         std::vector<float>& dist,
         size_t& searched_cnt,
@@ -64,23 +64,23 @@ public:
     );
     
 private:
-    void InsertIvf(const std::vector<float>& rawdata);
+    void InsertIvf(const std::vector<T>& rawdata);
 
-    const std::vector<float> GetSingleCode(size_t list_no, size_t offset) const;
+    const T* GetSingleCode(size_t list_no, size_t offset) const;
     // Given a long (N * M) codes, pick up n-th code
-    template<typename T>
+    // template<typename T>
     const std::vector<T> NthRawVector(const std::vector<T>& long_code, size_t n) const;
     // Member variables
     size_t N_, D_, L_, nq, kc, mc, dc;
     bool verbose_, write_trainset_, is_trained_;
 
-    std::unique_ptr<Quantizer::Quantizer> cq_;
+    std::unique_ptr<Quantizer::Quantizer<T>> cq_;
 
     std::vector<std::vector<float>> centers_cq_;
     std::vector<int> labels_cq_;
 
 
-    std::vector<std::vector<float>> db_codes_; // binary codes, size nlist
+    std::vector<std::vector<T>> db_codes_; // binary codes, size nlist
     std::vector<std::vector<int>> posting_lists_;  // (NumList, any)
 };
 

@@ -11,7 +11,8 @@ namespace Quantizer {
  * @param 
 */
 
-Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose=false)
+template <typename T>
+Quantizer<T>::Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose)
     : D_(D), N_(N), M_(M), K_(K), verbose_(verbose)
 {
     assert(D_ % M_ == 0);
@@ -37,15 +38,15 @@ Quantizer::Quantizer(size_t D, size_t N, size_t M, size_t K, bool verbose=false)
  * @param vec:  shape = Ds_
  * @param m:    m-th subspace
 */
-int Quantizer::predict_one(const std::vector<float>& vec, size_t m)
+template <typename T>
+uint32_t Quantizer<T>::predict_one(const T* vec, uint32_t m)
 {
-    assert(vec.size() == Ds_);
-    std::pair<size_t, float> nearest_one = NearestCenter(vec, centers_[m]);
-    return (int) nearest_one.first;
+    std::pair<uint32_t, float> nearest_one = NearestCenter(vec, centers_[m]);
+    return nearest_one.first;
 }
 
-void
-Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 123) 
+template <typename T>
+void Quantizer<T>::fit(const std::vector<T>& traindata, int iter, int seed) 
 {
     assert(N_ == traindata.size() / D_);
     assert(K_ < N_ && "the number of training vector should be more than K_");
@@ -58,10 +59,10 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
 
     auto traindata_trim = traindata;
     size_t Nt = traindata_trim.size() / D_;
-    std::vector<std::vector<float>> train_vecs(Nt, std::vector<float>(D_));
+    std::vector<std::vector<T>> train_vecs(Nt, std::vector<T>(D_));
 
     #pragma omp parallel for
-    for (std::size_t n = 0; n < Nt; ++n) {
+    for (size_t n = 0; n < Nt; ++n) {
         std::copy(traindata_trim.begin() + n * D_, traindata_trim.begin() + (n + 1) * D_, 
                     train_vecs[n].begin());
     }
@@ -71,7 +72,7 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
         if (verbose_) {
             std::cout << "Training the subspace: " << m << " / " << M_ << std::endl;
         }
-        std::vector<std::vector<float>> vecs_sub(Nt, std::vector<float>(Ds_, 0.0));
+        std::vector<std::vector<T>> vecs_sub(Nt, std::vector<T>(Ds_, 0.0));
         #pragma omp parallel for
         for (int i = 0; i < Nt; ++i) {
             std::copy(train_vecs[i].begin() + m * Ds_, train_vecs[i].begin() + (m + 1) * Ds_, 
@@ -79,7 +80,7 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
         }
         std::vector<std::vector<float>> centroids;
         std::vector<int> labels;
-        std::tie(centroids, labels) = KMeans(vecs_sub, K_, iter, "points");
+        std::tie(centroids, labels) = KMeans<T>(vecs_sub, K_, iter, "points");
         
         for (int k = 0; k < K_; ++k) {
             std::copy(centroids[k].begin(), centroids[k].end(), centers_[m][k].begin());
@@ -88,21 +89,23 @@ Quantizer::fit(const std::vector<float>& traindata, int iter = 20, int seed = 12
     }
 }
 
+template <typename T>
 const std::vector<std::vector<int>>&
-Quantizer::get_assignments() {return assignments_;}
+Quantizer<T>::GetAssignments() {return assignments_;}
 
+template <typename T>
 const std::vector<std::vector<std::vector<float>>>&
-Quantizer::get_centroids() {return centers_;}
+Quantizer<T>::get_centroids() {return centers_;}
 
-void 
-Quantizer::set_centroids(const std::vector<std::vector<std::vector<float>>>& centers_new)
+template <typename T>
+void Quantizer<T>::SetCentroids(const std::vector<std::vector<std::vector<float>>>& centers_new)
 {
     assert(centers_new.size() == M_);
     centers_ = centers_new;
 }
 
-void 
-Quantizer::Load(std::string quantizer_path)
+template <typename T>
+void Quantizer<T>::Load(std::string quantizer_path)
 {
     std::string center_suffix = "centers.fvecs";
     std::string assign_suffix = "assignments.ivecs";
@@ -115,8 +118,8 @@ Quantizer::Load(std::string quantizer_path)
     // LoadFromFileBinary(assignments_, quantizer_path + assign_suffix);
 }
 
-void 
-Quantizer::Write(std::string quantizer_path)
+template <typename T>
+void Quantizer<T>::Write(std::string quantizer_path)
 {
     std::string center_suffix = "centers.fvecs";
     std::string assign_suffix = "assignments.ivecs";
@@ -127,8 +130,9 @@ Quantizer::Write(std::string quantizer_path)
     // WriteToFileBinary(assignments_, quantizer_path + assign_suffix);
 }
 
+template <typename T>
 std::vector<std::vector<uint8_t>> 
-Quantizer::Encode(const std::vector<std::vector<float>>& rawdata) 
+Quantizer<T>::Encode(const std::vector<std::vector<T>>& rawdata) 
 {
     size_t N = rawdata.size();
     assert(D_ == rawdata[0].size());
@@ -139,7 +143,7 @@ Quantizer::Encode(const std::vector<std::vector<float>>& rawdata)
         if (verbose_) {
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
-        std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));
+        std::vector<std::vector<T>> vecs_sub(N, std::vector<T>(Ds_));
 
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
@@ -148,15 +152,16 @@ Quantizer::Encode(const std::vector<std::vector<float>>& rawdata)
 
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            auto [min_idx, min_dist] = NearestCenter(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = NearestCenter<T>(vecs_sub[i].data(), centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
     return codes;
 }
 
+template <typename T>
 std::vector<std::vector<uint8_t>> 
-Quantizer::Encode(const std::vector<float>& rawdata) 
+Quantizer<T>::Encode(const std::vector<T>& rawdata) 
 {
     size_t N = rawdata.size() / D_;
 
@@ -166,7 +171,7 @@ Quantizer::Encode(const std::vector<float>& rawdata)
         if (N > 1 && verbose_) {
             std::cout << "Encoding the subspace: " << m << " / " << M_ << std::endl;
         }
-        std::vector<std::vector<float>> vecs_sub(N, std::vector<float>(Ds_));
+        std::vector<std::vector<T>> vecs_sub(N, std::vector<T>(Ds_));
 
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
@@ -175,26 +180,31 @@ Quantizer::Encode(const std::vector<float>& rawdata)
         
         #pragma omp parallel for
         for (size_t i = 0; i < N; ++i) {
-            auto [min_idx, min_dist] = NearestCenter(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = NearestCenter<T>(vecs_sub[i].data(), centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
     return codes;
 }
 
-std::vector<float> Quantizer::NthVector(const std::vector<float>& long_code, size_t n)
+template <typename T>
+std::vector<T> 
+Quantizer<T>::NthVector(const std::vector<T>& long_code, size_t n)
 {
-    return std::vector<float>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
+    return std::vector<T>(long_code.begin() + n * D_, long_code.begin() + (n + 1) * D_);
 }
 
 // Each code: D = M_ * Ds_
-std::vector<float>
-Quantizer::NthVectorMthElement(const std::vector<float>& long_code, size_t n, int m)
+template <typename T>
+std::vector<T>
+Quantizer<T>::NthVectorMthElement(const std::vector<T>& long_code, size_t n, int m)
 {
-    return std::vector<float>(long_code.begin() + n * D_ + m * Ds_, 
+    return std::vector<T>(long_code.begin() + n * D_ + m * Ds_, 
                             long_code.begin() + n * D_ + (m + 1) * Ds_);
 }
 
+template class Quantizer<uint8_t>;
+template class Quantizer<float>;
 
 
 } // namespace pqkmeans

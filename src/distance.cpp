@@ -15,6 +15,27 @@ float fvec_L2sqr_ref(const float *x, const float *y, size_t d)
     return res_;
 }
 
+float fvec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
+{
+    size_t i;
+    int32_t res_ = 0;
+    for (i = 0; i < d; i++) {
+        const int32_t tmp = x[i] - y[i];
+        res_ += tmp * tmp;
+    }
+    return (float)res_;
+}
+
+float fvec_L2sqr(const uint8_t *x, const float *y, size_t d)
+{
+    size_t i;
+    float res_ = 0;
+    for (i = 0; i < d; i++) {
+        const float tmp = (float)x[i] - y[i];
+        res_ += tmp * tmp;
+    }
+    return res_;
+}
 
 // ========================= Reading functions ============================
 

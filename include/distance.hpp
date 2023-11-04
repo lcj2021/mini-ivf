@@ -29,6 +29,8 @@
 // From Faiss.
 // Reference implementation
 float fvec_L2sqr_ref(const float *x, const float *y, size_t d);
+float fvec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d);
+float fvec_L2sqr(const uint8_t *x, const float *y, size_t d);
 
 
 // ========================= Reading functions ============================

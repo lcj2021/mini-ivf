@@ -4,19 +4,17 @@
 #include <unordered_set>
 
 #include "binary_io.hpp"
-#include "index_ivfpq.hpp"
+#include "index_ivf.hpp"
 #include "quantizer.hpp"
 #include "util.hpp"
 
 size_t D;              // dimension of the vectors to index
 size_t nb;       // size of the database we plan to index
 size_t nt = 1'00'000;         // make a set of nt training vectors in the unit cube (could be the database)
-size_t mp = 480;
 size_t nq = 1'000;
 int ncentroids = 4096;
 
-std::string suffix = "nt" + ToStringWithUnits(nt) 
-                    + "_pq" + std::to_string(mp)
+std::string suffix = "nt" + ToStringWithUnits(nt)
                     + "_kc" + std::to_string(ncentroids);
 
 std::string index_path = std::string("/dk/anns/index/gist1m/")
@@ -37,21 +35,19 @@ int main(int argc, char* argv[]) {
 
     int nprobe = std::atoi(argv[1]);
 
-    toy::IVFPQConfig cfg(
+    toy::IVFConfig cfg(
         nb, D, nb, 
-        ncentroids, 256, 
-        1, mp, 
-        D, D / mp, 
+        ncentroids, 1, D, 
         index_path, db_path
     );
-    toy::IndexIVFPQ<float> index(cfg, nq, true);
+    toy::IndexIVF<float> index(cfg, nq, true);
 
     // std::vector<uint32_t> book(ncentroids);
     // std::iota(book.begin(), book.end(), (uint32_t)0);
     // index.LoadFromBook(book, db_path + "/gist1m_pq" + std::to_string(mp) + "_kc1000_cluster");
 
-    index.Train(database, 123, nt);
-    index.WriteIndex(index_path);
+    // index.Train(database, 123, nt);
+    // index.WriteIndex(index_path);
     index.LoadIndex(index_path);
     index.Populate(database);
 
@@ -77,8 +73,6 @@ int main(int argc, char* argv[]) {
     timer_query.Stop();
     std::cout << timer_query.GetTime() << " seconds.\n";
 
-    index.Finalize();
-
     int n_ok = 0;
     for (int q = 0; q < nq; ++q) {
         std::unordered_set<int> S(gt.begin() + q * 100, gt.begin() + q * 100 + k);
@@ -88,7 +82,7 @@ int main(int argc, char* argv[]) {
     }
     std::cout << "Recall@" << k << ": " << (double)n_ok / (nq * k) << '\n';
     std::cout << "avg_searched_cnt: " << (double)total_searched_cnt / nq << '\n';
-    printf("PQ%lu, kc%d, W%d\n", mp, ncentroids, nprobe);
+    printf("kc%d, W%d\n", ncentroids, nprobe);
     
     return 0;
 }
