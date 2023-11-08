@@ -7,7 +7,6 @@
 
 namespace index {
 
-namespace ivf {
 
 template < typename vector_dimension_t >
 class Quantizer {
@@ -15,17 +14,17 @@ public:
     explicit Quantizer(size_t D, size_t N, size_t M, size_t K);
 
     /// @brief Pick a best one for a vector
-    cluster_id_t PrediceOne(const std::vector<vector_dimension_t> & vec, size_t m);
+    inline cluster_id_t PrediceOne(const std::vector<vector_dimension_t> & vec, size_t m);
     
-    void Fit(const std::vector<vector_dimension_t>& rawdata, int iter, int seed);    // pydata.shape == N * D
-
-    void SetCentroids(const std::vector<std::vector<std::vector<vector_dimension_t>>>& centers_new);
+    void Fit(std::vector<vector_dimension_t> rawdata, size_t iter, int seed);    // pydata.shape == N * D
     
     void Load(const std::string & quantizer_path);
 
-    void Write(const std::string & quantizer_path);
+    void Write(const std::string & quantizer_path) const;
 
-    const std::vector<std::vector<std::vector<vector_dimension_t>>> & GetCentroids();
+    const std::vector<std::vector<std::vector<vector_dimension_t>>> & GetCentroids() const;
+
+    const std::vector<std::vector<uint8_t>> & GetAssignments() const;
 
     std::vector<std::vector<uint8_t>> Encode(
         const std::vector<vector_dimension_t> & rawdata
@@ -49,16 +48,10 @@ private:
     std::vector<std::vector<uint8_t>> assignments_;  
 
     // Given a long (N * M) codes, pick up n-th code
-    std::vector<float> NthVector(
-        const std::vector<vector_dimension_t>& buffer, size_t n
-    );
+    std::vector<float> NthVector(const std::vector<vector_dimension_t>& long_code, size_t n);
 
     // Given a long (N * M) codes, pick up m-th element from n-th code
-    std::vector<float> NthVectorMthElement(
-        const std::vector<vector_dimension_t>& long_code, size_t n, int m
-    );
-
-};
+    std::vector<float> NthVectorMthElement(const std::vector<vector_dimension_t>& long_code, size_t n, int m);
 
 };
 

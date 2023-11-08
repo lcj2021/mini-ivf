@@ -98,10 +98,7 @@ private: /// methods
  * @class Template class declarations.
 */
 template class IndexIVFPQ<uint8_t>;
-template class IndexIVFPQ<uint16_t>;
-template class IndexIVFPQ<uint32_t>;
 template class IndexIVFPQ<float>;
-template class IndexIVFPQ<double>;
 
 
 };

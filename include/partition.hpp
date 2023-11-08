@@ -1,5 +1,5 @@
-#ifndef INCLUDE_KMEANS_HPP
-#define INCLUDE_KMEANS_HPP
+#ifndef INCLUDE_PARTITION_HPP
+#define INCLUDE_PARTITION_HPP
 
 #include <index.hpp>
 
@@ -9,12 +9,11 @@
 #include <random>
 #include <numeric>
 #include <cassert>
-
 #include <distance.hpp>
 
 namespace index {
 
-template <typename vector_dimension_t> class KMeans {
+template <typename vector_dimension_t> class Partition {
 public:
     // Linear search by L2 Distance computation. Return the best one (id, distance)
     static std::pair<cluster_id_t, distance_t> NearestCenter(
@@ -36,12 +35,9 @@ public:
 /**
  * Template class declarations.
 */
-template class KMeans<uint8_t>;
-template class KMeans<uint16_t>;
-template class KMeans<uint32_t>;
-template class KMeans<uint64_t>;
-template class KMeans<float>;
-template class KMeans<double>;
+template class Partition<uint8_t>;
+template class Partition<float>;
+
 
 };
 
