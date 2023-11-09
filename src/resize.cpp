@@ -55,7 +55,7 @@ Resize<vector_dimension_t>::Nest(const std::vector<vector_dimension_t> & flatten
 
 template <typename vector_dimension_t> std::vector<std::vector<std::vector<vector_dimension_t>>>
 Resize<vector_dimension_t>::Nest(const std::vector<vector_dimension_t> & flattened, size_t d0, size_t d1, size_t d2)
-{
+{ 
     assert( flattened.size() == d0*d1*d2 );
     std::vector<std::vector<std::vector<vector_dimension_t>>> nested( d0, 
         std::vector<std::vector<vector_dimension_t>> ( d1, 

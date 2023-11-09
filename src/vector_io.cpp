@@ -63,7 +63,7 @@ VectorIO<T>::LoadFromFile(std::vector<T>& data, const std::string& filename, siz
     }
     // printf("All %s: [%zu x %d] has loaded!\n", filename.data(), expect_read_n, D);
     file.close();
-    return {N, D};
+    return {expect_read_n, D};
 }
 
 
