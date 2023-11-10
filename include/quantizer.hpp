@@ -14,17 +14,17 @@ public:
     explicit Quantizer(size_t D, size_t M, size_t K);
 
     /// @brief Pick a best one for a vector
-    inline cluster_id_t PrediceOne(const std::vector<vector_dimension_t> & vec, size_t m);
+    inline cluster_id_t PredictOne(const std::vector<vector_dimension_t> & vec, size_t m);
     
     void Fit(std::vector<vector_dimension_t> rawdata, size_t iter, int seed);    // pydata.shape == N * D
     
-    void Load(const std::string & quantizer_path);
+    void Load(const std::string & quantizer_filename);
 
-    void Write(const std::string & quantizer_path) const;
+    void Write(const std::string & quantizer_filename) const;
 
     const std::vector<std::vector<std::vector<vector_dimension_t>>> & GetCentroids() const;
 
-    const std::vector<std::vector<uint8_t>> & GetAssignments() const;
+    // const std::vector<std::vector<uint8_t>> & GetAssignments() const;
 
     std::vector<std::vector<uint8_t>> Encode(
         const std::vector<vector_dimension_t> & rawdata
@@ -33,6 +33,8 @@ public:
     std::vector<std::vector<uint8_t>> Encode(
         const std::vector<std::vector<vector_dimension_t>> & rawdata
     );
+
+    bool Ready();
 
 private:
     size_t D_;  // the demension of each vector
@@ -44,7 +46,9 @@ private:
     std::vector<std::vector<std::vector<vector_dimension_t>>> centers_;  
     // assignement for each intput vector. shape = M_ * N
     // assignments_[m][n] in [0, K_)
-    std::vector<std::vector<uint8_t>> assignments_;  
+    // std::vector<std::vector<uint8_t>> assignments_;  
+
+    bool ready_;
 
 };
 

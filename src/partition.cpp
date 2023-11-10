@@ -3,14 +3,14 @@
 namespace index {
 
 template<typename vector_dimension_t>
-std::pair<cluster_id_t, distance_t> Partition<vector_dimension_t>::NearestCenter(
+std::pair<cluster_id_t, float> Partition<vector_dimension_t>::NearestCenter(
     const std::vector<vector_dimension_t> & query, 
     const std::vector<std::vector<vector_dimension_t>> & centers
 )
 {
     size_t k = centers.size(), ds = centers[0].size();
     assert(k);
-    std::vector<distance_t> dists(k);
+    std::vector<float> dists(k);
 
     /// @bug No omp here.
     // #pragema omp parallel for
@@ -20,7 +20,7 @@ std::pair<cluster_id_t, distance_t> Partition<vector_dimension_t>::NearestCenter
     }
 
     // Just pick up the closest one.
-    distance_t min_dist = std::numeric_limits<distance_t>::max();
+    float min_dist = std::numeric_limits<float>::max();
     cluster_id_t min_id = 0;
     for (size_t i = 0; i < k; i++)
     {
@@ -36,7 +36,7 @@ std::pair<cluster_id_t, distance_t> Partition<vector_dimension_t>::NearestCenter
 
 
 template<typename vector_dimension_t>
-std::tuple<std::vector<std::vector<distance_t>>, std::vector<cluster_id_t>> Partition<vector_dimension_t>::KMeans(
+std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> Partition<vector_dimension_t>::KMeans(
     const std::vector<std::vector<vector_dimension_t>>& obs, 
     size_t k, 
     size_t iter, 
@@ -72,24 +72,24 @@ std::tuple<std::vector<std::vector<distance_t>>, std::vector<cluster_id_t>> Part
         // Assign each observation to the nearest centroid    
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++) {
-            distance_t min_dist;
+            float min_dist;
             std::tie(labels[i], min_dist) = NearestCenter(obs[i], centroids);
         }
         // Update centroids based on assigned observations
         #pragma omp parallel for
         for (size_t j = 0; j < k; j++) {
-            std::vector<distance_t> sum(D, 0.0);
+            std::vector<float> sum(D, 0.0);
             size_t count = 0;
             for (size_t i = 0; i < N; i++) {
                 if (labels[i] == j) {
-                    std::transform(sum.begin(), sum.end(), obs[i].begin(), sum.begin(), std::plus<distance_t>());
+                    std::transform(sum.begin(), sum.end(), obs[i].begin(), sum.begin(), std::plus<float>());
                     count++;
                 }
             }
             // To match the centroids and the labels, 
             // no update should be done in the last iter. 
             if (iter_count < iter - 1 && count > 0) {
-                std::transform(sum.begin(), sum.end(), centroids[j].begin(), [count](distance_t val) { return val / count; });
+                std::transform(sum.begin(), sum.end(), centroids[j].begin(), [count](float val) { return val / count; });
             }
         }
     }

@@ -12,7 +12,7 @@ namespace index {
 
 template <typename vector_dimension_t> 
 Quantizer<vector_dimension_t>::Quantizer(size_t D, size_t M, size_t K):
-    D_(D), M_(M), K_(K)
+    D_(D), M_(M), K_(K), ready_(false)
 {
     assert( D_ % M_ == 0 );
     Ds_ = D_ / M_;
@@ -28,9 +28,9 @@ Quantizer<vector_dimension_t>::Quantizer(size_t D, size_t M, size_t K):
     centers_.clear();
     centers_.resize(M_, std::vector<std::vector<vector_dimension_t>>(K_, std::vector<vector_dimension_t>(Ds_)));
 
-    assignments_.clear();
-    assignments_.resize(M_, std::vector<uint8_t>(N_));
-    assignments_.shrink_to_fit();
+    // assignments_.clear();
+    // assignments_.resize(M_, std::vector<uint8_t>(N_));
+    // assignments_.shrink_to_fit();
 
 }
 
@@ -41,7 +41,7 @@ Quantizer<vector_dimension_t>::Quantizer(size_t D, size_t M, size_t K):
  * @param m:    m-th subspace
 */
 template <typename vector_dimension_t> inline cluster_id_t 
-Quantizer<vector_dimension_t>::PrediceOne(const std::vector<vector_dimension_t> & vec, size_t m)
+Quantizer<vector_dimension_t>::PredictOne(const std::vector<vector_dimension_t> & vec, size_t m)
 {
     return Partition<vector_dimension_t>::NearestCenter(vec, centers_[m]).first;
 }
@@ -51,8 +51,8 @@ Quantizer<vector_dimension_t>::PrediceOne(const std::vector<vector_dimension_t> 
 template <typename vector_dimension_t> void
 Quantizer<vector_dimension_t>::Fit(std::vector<vector_dimension_t> rawdata, size_t iter, int seed)
 {
-    N = rawdata.size() / D_;
-    assert(K_ < N_ && "the number of training vector should be more than K_");
+    const size_t N = rawdata.size() / D_;
+    assert( K_ < N && "the number of training vector should be more than K_" );
 
     for (size_t m = 0; m < M_; m++)
     {
@@ -70,7 +70,7 @@ Quantizer<vector_dimension_t>::Fit(std::vector<vector_dimension_t> rawdata, size
         {
             std::copy(centroids[k].begin(), centroids[k].end(), centers_[m][k].begin());
         }
-        std::copy(labels.begin(), labels.end(), assignments_[m].begin());
+        // std::copy(labels.begin(), labels.end(), assignments_[m].begin());
     }
 }
 
@@ -81,29 +81,26 @@ Quantizer<vector_dimension_t>::GetCentroids() const { return centers_; }
 
 
 
-template <typename vector_dimension_t> const std::vector<std::vector<uint8_t>> &
-Quantizer<vector_dimension_t>::GetAssignments() const { return assignments_; }
+// template <typename vector_dimension_t> const std::vector<std::vector<uint8_t>> &
+// Quantizer<vector_dimension_t>::GetAssignments() const { return assignments_; }
 
 
 
 template <typename vector_dimension_t> void
-Quantizer<vector_dimension_t>::Load(const std::string & quantizer_path)
+Quantizer<vector_dimension_t>::Load(const std::string & quantizer_filename)
 {
-    const std::string center_suffix = "centers.fvecs";
-
     std::vector<vector_dimension_t> flat_center;
-    utils::VectorIO<vector_dimension_t>::LoadFromFile(flat_center, quantizer_path + center_suffix);
+    utils::VectorIO<vector_dimension_t>::LoadFromFile(flat_center, quantizer_filename);
     centers_ = utls::Resize<vector_dimension_t>::Nest(flat_center, M_, K_, Ds_);
 }
 
 
 
 template <typename vector_dimension_t> void
-Quantizer<vector_dimension_t>::Write(const std::string & quantizer_path) const
+Quantizer<vector_dimension_t>::Write(const std::string & quantizer_filename) const
 {
-    const std::string center_suffix = "centers.fvecs";
     auto flat_center = utils::Resize<vector_dimension_t>::Flatten(centers_);
-    utils::VectorIO<vector_dimension_t>::WriteToFile(flat_center, {1, M_ * K_ * Ds_}, quantizer_path + center_suffix);
+    utils::VectorIO<vector_dimension_t>::WriteToFile(flat_center, {1, M_ * K_ * Ds_}, quantizer_filename);
 }
 
 
@@ -166,6 +163,10 @@ Quantizer<vector_dimension_t>::Encode(const std::vector<std::vector<vector_dimen
     return codes;
 }
 
+
+
+template <typename vector_dimension_t> bool 
+Quantizer<vector_dimension_t>::Ready() { return ready_; }
 
 
 

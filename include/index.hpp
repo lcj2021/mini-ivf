@@ -8,7 +8,6 @@ namespace index {
 using cluster_id_t  = uint32_t;
 using vector_id_t = uint32_t;
 using querynode_id_t = uint8_t;
-using distance_t = float;
 
 enum IndexStatus { LOCAL, DISTRIBUTED };
 

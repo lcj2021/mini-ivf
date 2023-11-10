@@ -18,28 +18,39 @@
 // (runtime) REF >> SSE >= AVX ~ AVX512
 
 
-// ========================= Distance functions ============================
-
 #if defined(__AVX512F__)  
 static const std::string g_simd_architecture = "avx512";
-// AVX512 implementation by Yusuke
-float vec_L2sqr (const float *x, const float *y, size_t d);
-float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d);
+static const size_t num_float_per_simd_vector = 16;
 
-#elif defined (__AVX__)  
+// mm512 hadd function
+static inline __m512 _mm512_hadd_ps(__m512 a);
+
+#elif defined(__AVX__)  
 static const std::string g_simd_architecture = "avx";
-// AVX implementation
-float vec_L2sqr (const float *x, const float *y, size_t d);
-float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d);
+static const size_t num_float_per_simd_vector = 8;
 
 #else 
 static const std::string g_simd_architecture = "sse";
-// SSE implementation. Unroot!
+static const size_t num_float_per_simd_vector = 4;
+
+#endif
+
+// ========================= Distance functions ============================
+
 float vec_L2sqr(const float *x, const float *y, size_t d);
+
+
 float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d);
 
 
-#endif
+// ========================= Distance functions in Batch ============================
+
+void vec_L2sqr_batch(const float * x, const float *y, size_t d, float * dists, bool flush = false);
+
+
+void vec_L2sqr_batch(const uint8_t * x, const uint8_t *y, size_t d, float * dists, bool flush = false);
+
+
 
 // namespace Anonymous
 

@@ -1,6 +1,3 @@
-// #undef __AVX512F__
-// #undef __AVX__
-
 #include <distance.hpp>
 #include <iostream>
 #include <vector>

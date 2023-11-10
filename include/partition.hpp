@@ -16,13 +16,13 @@ namespace index {
 template <typename vector_dimension_t> class Partition {
 public:
     // Linear search by L2 Distance computation. Return the best one (id, distance)
-    static std::pair<cluster_id_t, distance_t> NearestCenter(
+    static std::pair<cluster_id_t, float> NearestCenter(
         const std::vector<vector_dimension_t> & query, 
         const std::vector<std::vector<vector_dimension_t>> & centers
     );
 
     // kmeans Lloyd implementation
-    static std::tuple<std::vector<std::vector<distance_t>>, std::vector<cluster_id_t>> 
+    static std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> 
     KMeans(
         const std::vector<std::vector<vector_dimension_t>>& obs, 
         size_t k, 

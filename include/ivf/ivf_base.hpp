@@ -21,7 +21,6 @@ protected:
     std::string db_path_;
 
     std::vector<SegmentClass> segments_;
-    std::vector<std::vector<vector_dimension_t>> centers_;
     
     size_t num_threads_;
 
@@ -43,7 +42,7 @@ public:
     /// @brief Write index file (Assert status == IndexStatus::LOCAL)
     void WriteIndex() = 0;
 
-    /// @brief  Load all segments (Assert status == IndexStatus::LOCAL)
+    /// @brief  Load all segments
     void LoadSegments() = 0;
 
     /// @brief Load partial segments (status for either LOCAL and DISTRIBUTED)
@@ -69,16 +68,36 @@ public:
     void SetDBPath(const std::string & db_path);
 
     /// @brief Single Query
-    std::vector<vector_id_t> TopKID(size_t k, const std::vector<vector_dimension_t> & query) = 0;
+    void TopKID (
+        size_t k, 
+        const std::vector<vector_dimension_t> & query, 
+        const std::vector<cluster_id_t> & book,
+        std::vector<vector_id_t> & vid,
+        std::vector<float> & dist
+    ) = 0;
 
     /// @brief Batch Queries
-    std::vector<std::vector<vector_id_t>> TopKID(size_t k, const std::vector<std::vector<vector_dimension_t>> & queries) = 0;
+    void TopKID (
+        size_t k, 
+        const std::vector<std::vector<vector_dimension_t>> & queries,
+        const std::vector<std::vector<cluster_id_t>> & books,
+        std::vector<std::vector<vector_id_t>> & vids,
+        std::vector<std::vector<float>> & dists
+    ) = 0;
 
     /// @brief Single Topw query
-    std::vector<cluster_id_t> TopWID(size_t w, const std::vector<vector_dimension_t> & query) = 0;
+    void TopWID (
+        size_t w, 
+        const std::vector<vector_dimension_t> & query,
+        std::vector<cluster_id_t> & book
+    ) = 0;
 
     /// @brief Batch Topw Queries
-    std::vector<std::vector<cluster_id_t>> TopWID(size_t w, const std::vector<std::vector<vector_dimension_t>> & queries) = 0;
+    void TopWID (
+        size_t w, 
+        const std::vector<std::vector<vector_dimension_t>> & queries,
+        std::vector<std::vector<cluster_id_t>> & books
+    ) = 0;
 
 };
 
