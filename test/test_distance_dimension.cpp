@@ -4,10 +4,13 @@
 #include <vector>
 #include <chrono>
 
+#include <cassert>
+#include <cmath>
+
 
 using namespace std;
 
-using dim_t = float;
+using dim_t = uint8_t;
 
 class Timer {
 public:
@@ -20,7 +23,7 @@ public:
         auto duration = end - start;
         double milliseconds = duration * 0.001;
 
-        std::cout << "Time taken: " << milliseconds << " ms" << std::endl;
+        std::cout << milliseconds << endl;
     }
 
 private:
@@ -40,39 +43,45 @@ float vec_L2sqr_groudthruth(const dim_t* a, const dim_t* b, size_t dim)
 
 int main()
 {
-    const size_t N = 100000;
-    const size_t d = 2;
+    const size_t N = 1000000;
+    const size_t D = 64;
+    const float err = 1e-2;
 
-    vector<vector<dim_t>> as(N, vector<dim_t> (d));
-    vector<vector<dim_t>> bs(N, vector<dim_t> (d));
+    vector<vector<dim_t>> as(N, vector<dim_t> (D));
+    vector<vector<dim_t>> bs(N, vector<dim_t> (D));
 
     for (size_t i = 0; i < N; i++)
     {
-        for (size_t j = 0; j < d; j++)
+        for (size_t j = 0; j < D; j++)
         {
             as[i][j] = rand() % 256;
             bs[i][j] = rand() % 256;
         }
     }
 
-    float gt[N + num_float_per_simd_vector];
-    float bds[N + num_float_per_simd_vector];
+    float gt[N];
+    float nos[N];
 
-    { Timer t;
-        cout << "brute force" << endl;
-        for (size_t i = 0; i < N; i++)
-        {
-            gt[i] = vec_L2sqr_groudthruth(as[i].data(), bs[i].data(), d);
+    for (size_t d = 1; d <= D; d++) {
+        { Timer t;
+            cout << "brute force ";
+            for (size_t i = 0; i < N; i++)
+            {
+                gt[i] = vec_L2sqr_groudthruth(as[i].data(), bs[i].data(), d);
+            }
         }
-    }
 
-    { Timer t;
-        cout << g_simd_architecture << endl;
-        for (size_t i = 0; i < N - 1; i++)
-        {
-            vec_L2sqr_batch(as[i].data(), bs[i].data(), d, bds + i);
+        { Timer t;
+            cout << g_simd_architecture << " [classify] ";
+            for (size_t i = 0; i < N; i++)
+            {
+                nos[i] = vec_L2sqr(as[i].data(), bs[i].data(), d);
+            }
         }
-        vec_L2sqr_batch(as.back().data(), bs.back().data(), d, bds + N - 1);
+
+        for (size_t i = 0; i < N; i++) {
+            assert( fabs(gt[i] - nos[i]) < err );
+        }
     }
 
     return 0;

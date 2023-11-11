@@ -72,6 +72,15 @@ static inline __m128i masked_read (size_t d, const uint8_t *x)
 // AVX512 implementation by Yusuke
 float vec_L2sqr (const float *x, const float *y, size_t d)
 {
+    /// @brief when dimension < 20, the runtime of distance function show that bruteforce < simd.
+    if ( d < bf_upbound_lim_float ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m512 msum1 = _mm512_setzero_ps();
 
     while (d >= 16) {
@@ -127,6 +136,14 @@ float vec_L2sqr (const float *x, const float *y, size_t d)
 
 float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
 {
+    if ( d < bf_upbound_lim_uint8 ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m512 msum1 = _mm512_setzero_ps();
     const __m512i m512i_zero = _mm512_setzero_si512();
 
@@ -230,6 +247,14 @@ inline __m512 _mm512_hadd_ps(__m512 a) {
 // AVX implementation
 float vec_L2sqr (const float *x, const float *y, size_t d)
 {
+    if ( d < bf_upbound_lim_float ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m256 msum1 = _mm256_setzero_ps();
 
     while (d >= 8) {
@@ -272,6 +297,14 @@ float vec_L2sqr (const float *x, const float *y, size_t d)
 
 float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
 {
+    if ( d < bf_upbound_lim_uint8 ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m256 msum1 = _mm256_setzero_ps();
     const __m256i m256i_zero = _mm256_setzero_si256();
 
@@ -345,6 +378,14 @@ float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
 // distance for vector<float>
 float vec_L2sqr(const float *x, const float *y, size_t d)
 {
+    if ( d < bf_upbound_lim_float ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m128 msum1 = _mm_setzero_ps();
 
     while (d >= 4) {
@@ -375,6 +416,14 @@ float vec_L2sqr(const float *x, const float *y, size_t d)
 
 // distance for vector<uint8_t>
 float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d) {
+    if ( d < bf_upbound_lim_uint8 ) {
+        float dist = 0;
+        for (size_t i = 0; i < d; i++) {
+            dist += (x[i] - y[i]) * (x[i] - y[i]);
+        }
+        return dist;
+    }
+
     __m128 msum = _mm_setzero_ps();
     const __m128i m128i_zero = _mm_setzero_si128();
 
@@ -420,240 +469,3 @@ float vec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d) {
 }
 
 #endif
-
-
-
-
-/// Batch Distance Funtions
-
-
-/// @attention If you use this function, please make sure that your dists has enough space (>= num_float_per_simd_vector) by reserve your result-vector.
-void vec_L2sqr_batch(const float * x, const float * y, size_t d, float * dists, bool flush)
-{
-    static size_t nf = 0;
-    static size_t nd = 0;
-    static float bufx[num_float_per_simd_vector];
-    static float bufy[num_float_per_simd_vector];
-
-    assert( d && "vec_L2sqr_batch: d must be non-zero." );
-
-    if (nd && nd != d) {
-        std::cerr << "vec_L2sqr_batch: d must be the same for all calls." << std::endl;
-        exit(1);
-    }
-    if (nf + d > num_float_per_simd_vector) {
-        std::cerr << "batch distance overflow." << std::endl;
-        exit(1);
-    }
-
-    nd = d;
-    assert( 1 <= nd && nd <= num_float_per_simd_vector && "vec_L2sqr_batch: nd must be in [1, num_float_per_simd_vector]." );
-
-    while (d--) {
-        bufx[nf] = x[d];
-        bufy[nf] = y[d];
-        nf++;
-    }
-
-    if (flush || nf + d > num_float_per_simd_vector) {
-        /// @brief batch computation.
-#if defined(__AVX512F__)
-        __m512 mx = _mm512_loadu_ps(bufx);
-        __m512 my = _mm512_loadu_ps(bufy);
-        __m512 df = _mm512_sub_ps(mx, my);
-        __m512 msum, msum1, msum2, msum3, msum4;
-        msum = _mm512_mul_ps(df, df);
-        if ( nd > 8 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            __m512 msum3 = _mm512_hadd_ps(msum2);
-            __m512 msum4 = _mm512_hadd_ps(msum3);
-            _mm512_storeu_ps(dists, msum4);
-        }
-        else if ( nd > 4 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            __m512 msum3 = _mm512_hadd_ps(msum2);
-            _mm512_storeu_ps(dists, msum3);
-        }
-        else if ( nd > 2 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            _mm512_storeu_ps(dists, msum2);
-        }
-        else if ( nd > 1 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            _mm512_storeu_ps(dists, msum1);
-        }
-        else { // nd == 1
-            _mm512_storeu_ps(dists, msum);
-        }
-#elif defined(__AVX__)
-        __m256 mx = _mm256_loadu_ps(bufx);
-        __m256 my = _mm256_loadu_ps(bufy);
-        __m256 df = _mm256_sub_ps(mx, my);
-        __m256 msum, msum1, msum2, msum3;
-        msum = _mm256_mul_ps(df, df);
-        if ( nd > 4 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            __m256 msum2 = _mm256_hadd_ps(msum1, msum1);
-            __m256 msum3 = _mm256_hadd_ps(msum2, msum2);
-            _mm256_storeu_ps(dists, msum3);
-        }
-        else if ( nd > 2 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            __m256 msum2 = _mm256_hadd_ps(msum1, msum1);
-            _mm256_storeu_ps(dists, msum2);
-        }
-        else if ( nd > 1 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            _mm256_storeu_ps(dists, msum1);
-        }
-        else { // nd == 1
-            _mm256_storeu_ps(dists, msum1);
-        }
-#else
-        __m128 mx = _mm_loadu_ps(bufx);
-        __m128 my = _mm_loadu_ps(bufy);
-        __m128 df = _mm_sub_ps(mx, my);
-        __m128 msum, msum1, msum2;
-        msum = _mm_mul_ps(df, df);
-        switch (nd) {
-        case 4: 
-        case 3: 
-            msum1 = _mm_hadd_ps(msum, msum);
-            msum2 = _mm_hadd_ps(msum1, msum1);
-            _mm_storeu_ps(dists, msum2);
-            break;
-        case 2: 
-            msum1 = _mm_hadd_ps(msum, msum);
-            _mm_storeu_ps(dists, msum1);
-            break;
-        case 1:
-            _mm_storeu_ps(dists, msum);
-        }
-#endif
-
-        // flush work
-        std::fill_n(bufx, num_float_per_simd_vector, 0.0);
-        std::fill_n(bufy, num_float_per_simd_vector, 0.0);
-        nf = nd = 0;
-    }
-}
-
-
-
-
-/// @attention If you use this function, please make sure that your dists has enough space (>= num_float_per_simd_vector) by reserve your result-vector.
-void vec_L2sqr_batch(const uint8_t * x, const uint8_t * y, size_t d, float * dists, bool flush)
-{
-    static size_t nf = 0;
-    static size_t nd = 0;
-    static float bufx[num_float_per_simd_vector];
-    static float bufy[num_float_per_simd_vector];
-
-    assert( d && "vec_L2sqr_batch: d must be non-zero." );
-
-    if (nd && nd != d) {
-        std::cerr << "vec_L2sqr_batch: d must be the same for all calls." << std::endl;
-        exit(1);
-    }
-    if (nf + d > num_float_per_simd_vector) {
-        std::cerr << "batch distance overflow." << std::endl;
-        exit(1);
-    }
-
-    nd = d;
-    assert( 1 <= nd && nd <= num_float_per_simd_vector && "vec_L2sqr_batch: nd must be in [1, num_float_per_simd_vector]." );
-
-    while (d--) {
-        bufx[nf] = x[d];
-        bufy[nf] = y[d];
-        nf++;
-    }
-
-    if (flush || nf + d >= num_float_per_simd_vector) {
-        /// @brief batch computation.
-#if defined(__AVX512F__)
-        __m512 mx = _mm512_loadu_ps(bufx);
-        __m512 my = _mm512_loadu_ps(bufy);
-        __m512 df = _mm512_sub_ps(mx, my);
-        __m512 msum, msum1, msum2, msum3, msum4;
-        msum = _mm512_mul_ps(df, df);
-        if ( nd > 8 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            __m512 msum3 = _mm512_hadd_ps(msum2);
-            __m512 msum4 = _mm512_hadd_ps(msum3);
-            _mm512_storeu_ps(dists, msum4);
-        }
-        else if ( nd > 4 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            __m512 msum3 = _mm512_hadd_ps(msum2);
-            _mm512_storeu_ps(dists, msum3);
-        }
-        else if ( nd > 2 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            __m512 msum2 = _mm512_hadd_ps(msum1);
-            _mm512_storeu_ps(dists, msum2);
-        }
-        else if ( nd > 1 ) {
-            __m512 msum1 = _mm512_hadd_ps(msum);
-            _mm512_storeu_ps(dists, msum1);
-        }
-        else { // nd == 1
-            _mm512_storeu_ps(dists, msum);
-        }
-#elif defined(__AVX__)
-        __m256 mx = _mm256_loadu_ps(bufx);
-        __m256 my = _mm256_loadu_ps(bufy);
-        __m256 df = _mm256_sub_ps(mx, my);
-        __m256 msum, msum1, msum2, msum3;
-        msum = _mm256_mul_ps(df, df);
-        if ( nd > 4 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            __m256 msum2 = _mm256_hadd_ps(msum1, msum1);
-            __m256 msum3 = _mm256_hadd_ps(msum2, msum2);
-            _mm256_storeu_ps(dists, msum3);
-        }
-        else if ( nd > 2 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            __m256 msum2 = _mm256_hadd_ps(msum1, msum1);
-            _mm256_storeu_ps(dists, msum2);
-        }
-        else if ( nd > 1 ) {
-            __m256 msum1 = _mm256_hadd_ps(msum, msum);
-            _mm256_storeu_ps(dists, msum1);
-        }
-        else { // nd == 1
-            _mm256_storeu_ps(dists, msum1);
-        }
-#else
-        __m128 mx = _mm_loadu_ps(bufx);
-        __m128 my = _mm_loadu_ps(bufy);
-        __m128 df = _mm_sub_ps(mx, my);
-        __m128 msum, msum1, msum2;
-        msum = _mm_mul_ps(df, df);
-        switch (nd) {
-        case 4: 
-        case 3: 
-            msum1 = _mm_hadd_ps(msum, msum);
-            msum2 = _mm_hadd_ps(msum1, msum1);
-            _mm_storeu_ps(dists, msum2);
-            break;
-        case 2: 
-            msum1 = _mm_hadd_ps(msum, msum);
-            _mm_storeu_ps(dists, msum1);
-            break;
-        case 1:
-            _mm_storeu_ps(dists, msum);
-        }
-#endif
-
-        // flush work
-        std::fill_n(bufx, num_float_per_simd_vector, 0.0);
-        std::fill_n(bufy, num_float_per_simd_vector, 0.0);
-        nf = nd = 0;
-    }
-}

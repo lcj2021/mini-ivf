@@ -35,7 +35,7 @@ public:
         auto duration = end - start;
         double milliseconds = duration * 0.001;
 
-        std::cout << "Time taken: " << milliseconds << " ms" << std::endl;
+        std::cout << milliseconds << endl;
     }
 
 private:
