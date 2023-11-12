@@ -1,11 +1,10 @@
 #ifndef INCLUDE_INDEX_IVFPQ_HPP
 #define INCLUDE_INDEX_IVFPQ_HPP
 
-#include <ivf_base.hpp>
+#include <ivf/ivf_base.hpp>
 #include <vector>
 #include <quantizer.hpp>
 
-#define __AVX512F__;
 
 namespace index {
 
@@ -69,8 +68,8 @@ private: /// variables
     // - vector<std::vector<vector_dimension_t>> centers_;          //
     //==============================================================*/
 
-    ::Quantizer<vector_dimension_t> cq_;
-    ::Quantizer<vector_dimension_t> pq_;
+    index::Quantizer<vector_dimension_t> cq_;
+    index::Quantizer<vector_dimension_t> pq_;
     std::vector<std::vector<vector_id_t>> postint_lists_; // id for each vectors in segments
 
     size_t nsamples_; // training sample number
@@ -83,14 +82,16 @@ private: /// variables
     // std::vector<std::vector<uint8_t>> labels_pq_;
 
     /// const variables
-    static const std::string cq_prefix          = "cq_";
-    static const std::string pq_prefix          = "pq_";
-    static const std::string vector_prefix      = "pqcode_";
-    static const std::string id_prefix          = "id_";
+    const std::string cq_prefix          = "cq_";
+    const std::string pq_prefix          = "pq_";
+    const std::string vector_prefix      = "pqcode_";
+    const std::string id_prefix          = "id_";
 
 public: /// methods
     explicit IndexIVFPQ(
-        size_t N, size_t D, size_t L, size_t kc, size_t kp, size_t mc, size_t mp, size_t dc, size_t dp, // index config
+        size_t N, size_t D, size_t L, 
+        size_t kc, 
+        size_t kp, size_t mp,  // index config
         const std::string & index_path, 
         const std::string & db_path,
         const std::string & name = "",

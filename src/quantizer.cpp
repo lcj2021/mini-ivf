@@ -4,8 +4,8 @@
 #include <algorithm>
 #include <tuple>
 #include <partition.hpp>
-#include <vector_io.hpp>
-#include <resize.hpp>
+#include <utils/vector_io.hpp>
+#include <utils/resize.hpp>
 
 namespace index {
 
@@ -91,7 +91,7 @@ Quantizer<vector_dimension_t>::Load(const std::string & quantizer_filename)
 {
     std::vector<vector_dimension_t> flat_center;
     utils::VectorIO<vector_dimension_t>::LoadFromFile(flat_center, quantizer_filename);
-    centers_ = utls::Resize<vector_dimension_t>::Nest(flat_center, M_, K_, Ds_);
+    centers_ = utils::Resize<vector_dimension_t>::Nest(flat_center, M_, K_, Ds_);
 }
 
 
@@ -113,7 +113,7 @@ Quantizer<vector_dimension_t>::Encode(const std::vector<vector_dimension_t> & ra
     
     for (size_t m = 0; m < M_; m++)
     {
-        std::vector<std::vector<uint8_t>> vecs_sub(N, std::vector<uint8_t>(Ds_));
+        std::vector<std::vector<vector_dimension_t>> vecs_sub(N, std::vector<vector_dimension_t>(Ds_));
 
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++)
@@ -124,7 +124,7 @@ Quantizer<vector_dimension_t>::Encode(const std::vector<vector_dimension_t> & ra
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++)
         {
-            auto [min_idx, min_dist] = utils::Partition<vector_dimension_t>::NearestCenter(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = index::Partition<vector_dimension_t>::NearestCenter(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }
@@ -155,7 +155,7 @@ Quantizer<vector_dimension_t>::Encode(const std::vector<std::vector<vector_dimen
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++)
         {
-            auto [min_idx, min_dist] = utils::Partition<vector_dimension_t>::NearestCenter(vecs_sub[i], centers_[m]);
+            auto [min_idx, min_dist] = index::Partition<vector_dimension_t>::NearestCenter(vecs_sub[i], centers_[m]);
             codes[i][m] = (uint8_t)min_idx;
         }
     }

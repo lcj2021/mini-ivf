@@ -1,8 +1,8 @@
-#include <index_ivfpq.hpp>
+#include <ivf/index_ivfpq.hpp>
 #include <omp.h>
 #include <cassert>
 #include <iostream>
-#include <timer.hpp>
+#include <stimer.hpp>
 #include <distance.hpp>
 #include <unordered_set>
 #include <vector_io.hpp>
@@ -39,22 +39,22 @@ inline float DistanceTable::GetValue(size_t m, size_t ks) const
 template <typename vector_dimension_t> 
 IndexIVFPQ<vector_dimension_t>::IndexIVFPQ(
     size_t N, size_t D, size_t L,    // ivfpq-info
-    size_t kc, size_t mc, size_t dc, // level1-index-info
-    size_t kp, size_t mp, size_t dp, // level2-index-info
+    size_t kc,                       // level1-index-info
+    size_t kp, size_t mp,            // level2-index-info
     const std::string & index_path, 
     const std::string & db_path,
     const std::string & name = "",
     IndexStatus status = IndexStatus::LOCAL
 ): 
 N_(N), D_(D), L_(L), 
-kc_(kc), mc_(mc), dc_(dc),
-kp_(kp), mp_(mp), dp_(dp),
+kc_(kc), mc_(1), dc_(D),
+kp_(kp), mp_(mp), dp_(D / mp),
 index_path_(index_path), db_path_(db_path), 
 name_(name), status_(status),
 nsamples_(0), seed_(-1),
 cq_(dc_, mc_, kc_), pq_(dp_, mp_, kp_)
 {
-    assert( dc_ == D_ && mc_ == 1 ); 
+    // assert( dc_ == D_ && mc_ == 1 ); 
     assert( mp_ * dp_ == D_ );
 
     if (index_path_.back() != '/') index_path_ += "/";
@@ -260,7 +260,7 @@ IndexIVFPQ<vector_dimension_t>::InsertIvf(const std::vector<vector_dimension_t> 
     }
 
     std::cout << "Start to insert pqcodes to IVFPQ index" << std::endl;
-    utils::Timer timer;
+    utils::STimer timer;
     timer.Start();
 
     #pragma omp parallel for

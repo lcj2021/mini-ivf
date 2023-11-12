@@ -33,23 +33,23 @@ public:
     );
 
     /// @attention Basic public virtual methods
-    void Populate(const std::vector<vector_dimension_t> & raw_data) = 0;
+    virtual void Populate(const std::vector<vector_dimension_t> & raw_data) = 0;
 
-    void Train(const std::vector<vector_dimension_t> & raw_data) = 0;
+    virtual void Train(const std::vector<vector_dimension_t> & raw_data) = 0;
 
-    void LoadIndex() = 0;
+    virtual void LoadIndex() = 0;
 
     /// @brief Write index file (Assert status == IndexStatus::LOCAL)
-    void WriteIndex() = 0;
+    virtual void WriteIndex() = 0;
 
     /// @brief  Load all segments
-    void LoadSegments() = 0;
+    virtual void LoadSegments() = 0;
 
     /// @brief Load partial segments (status for either LOCAL and DISTRIBUTED)
-    void LoadSegments(const std::vector<cluster_id_t> & book) = 0;
+    virtual void LoadSegments(const std::vector<cluster_id_t> & book) = 0;
 
     /// @brief Write all segments (Assert status == IndexStatus::LOCAL)
-    void WriteSegments() = 0;
+    virtual void WriteSegments() = 0;
 
     size_t GetNumThreads() const;
 
@@ -68,7 +68,7 @@ public:
     void SetDBPath(const std::string & db_path);
 
     /// @brief Single Query
-    void TopKID (
+    virtual void TopKID (
         size_t k, 
         const std::vector<vector_dimension_t> & query, 
         const std::vector<cluster_id_t> & book,
@@ -77,7 +77,7 @@ public:
     ) = 0;
 
     /// @brief Batch Queries
-    void TopKID (
+    virtual void TopKID (
         size_t k, 
         const std::vector<std::vector<vector_dimension_t>> & queries,
         const std::vector<std::vector<cluster_id_t>> & books,
@@ -86,14 +86,14 @@ public:
     ) = 0;
 
     /// @brief Single Topw query
-    void TopWID (
+    virtual void TopWID (
         size_t w, 
         const std::vector<vector_dimension_t> & query,
         std::vector<cluster_id_t> & book
     ) = 0;
 
     /// @brief Batch Topw Queries
-    void TopWID (
+    virtual void TopWID (
         size_t w, 
         const std::vector<std::vector<vector_dimension_t>> & queries,
         std::vector<std::vector<cluster_id_t>> & books

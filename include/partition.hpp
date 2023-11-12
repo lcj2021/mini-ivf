@@ -22,7 +22,7 @@ public:
     );
 
     // kmeans Lloyd implementation
-    static std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> 
+    static std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t>> 
     KMeans(
         const std::vector<std::vector<vector_dimension_t>>& obs, 
         size_t k, 

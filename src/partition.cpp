@@ -1,4 +1,6 @@
 #include <partition.hpp>
+#include <iostream>
+#include <algorithm>
 
 namespace index {
 
@@ -14,7 +16,7 @@ std::pair<cluster_id_t, float> Partition<vector_dimension_t>::NearestCenter(
 
     /// @bug No omp here.
     // #pragema omp parallel for
-    for (size_t i = 0; i < K_; i++)
+    for (size_t i = 0; i < k; i++)
     {
         dists[i] = vec_L2sqr(query.data(), centers[i].data(), ds);
     }
@@ -36,7 +38,7 @@ std::pair<cluster_id_t, float> Partition<vector_dimension_t>::NearestCenter(
 
 
 template<typename vector_dimension_t>
-std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> Partition<vector_dimension_t>::KMeans(
+std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t>> Partition<vector_dimension_t>::KMeans(
     const std::vector<std::vector<vector_dimension_t>>& obs, 
     size_t k, 
     size_t iter, 
@@ -62,12 +64,12 @@ std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> Partition
         }
     }
     else {
-        std::err << "Unknown clustering initial method: " << minit << "\n";
+        std::cerr << "Unknown clustering initial method: " << minit << "\n";
         exit(1);
     }
     
     // Perform k-means iterations
-    std::vector<int> labels(N);
+    std::vector<cluster_id_t> labels(N);
     for (size_t iter_count = 0; iter_count < iter; iter_count++) {
         // Assign each observation to the nearest centroid    
         #pragma omp parallel for
@@ -93,7 +95,8 @@ std::tuple<std::vector<std::vector<float>>, std::vector<cluster_id_t>> Partition
             }
         }
     }
-    return { centroids, labels };
+    return std::make_pair(centroids, labels);
+
 }
 
 
