@@ -18,9 +18,9 @@ public:
     
     void Fit(std::vector<vector_dimension_t> rawdata, size_t iter, int seed);    // pydata.shape == N * D
     
-    void Load(const std::string & quantizer_filename);
+    void LoadCenters(const std::string & quantizer_filename);
 
-    void Write(const std::string & quantizer_filename) const;
+    void WriteCenters(const std::string & quantizer_filename) const;
 
     const std::vector<std::vector<std::vector<vector_dimension_t>>> & GetCentroids() const;
 

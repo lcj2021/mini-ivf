@@ -1,5 +1,6 @@
-#include <resize.hpp>
+#include <utils/resize.hpp>
 #include <cassert>
+#include <iostream>
 
 
 
@@ -68,7 +69,7 @@ Resize<vector_dimension_t>::Nest(const std::vector<vector_dimension_t> & flatten
         {
             std::copy(
                 flattened.begin() + i*d1*d2 + j*d2, 
-                flattened.begin() + (i+1)*d1*d2 + j*d2, 
+                flattened.begin() + i*d1*d2 + (j+1)*d2, 
                 nested[i][j].begin()
             );
         }

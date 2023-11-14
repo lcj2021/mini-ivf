@@ -70,7 +70,7 @@ private: /// variables
 
     index::Quantizer<vector_dimension_t> cq_;
     index::Quantizer<vector_dimension_t> pq_;
-    std::vector<std::vector<vector_id_t>> postint_lists_; // id for each vectors in segments
+    std::vector<std::vector<vector_id_t>> posting_lists_; // id for each vectors in segments
 
     size_t nsamples_; // training sample number
     int seed_;        // seed
@@ -82,10 +82,11 @@ private: /// variables
     // std::vector<std::vector<uint8_t>> labels_pq_;
 
     /// const variables
-    const std::string cq_prefix          = "cq_";
-    const std::string pq_prefix          = "pq_";
+    const std::string cq_centers         = "cq_centers";
+    const std::string pq_centers         = "pq_centers";
     const std::string vector_prefix      = "pqcode_";
     const std::string id_prefix          = "id_";
+
 
 public: /// methods
     explicit IndexIVFPQ(
@@ -157,12 +158,14 @@ private: /// methods
 
     inline DistanceTable DTable(const std::vector<vector_dimension_t> & vec) const;
 
+    bool Ready(); // ready to topk (all elements ready)
+
 };
 
 
-/**
- * @class Template class declarations.
-*/
+/*************************************** 
+ * @class Template class declarations. * 
+ ***************************************/
 template class IndexIVFPQ<uint8_t>;
 template class IndexIVFPQ<float>;
 

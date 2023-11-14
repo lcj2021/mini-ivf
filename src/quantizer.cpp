@@ -72,6 +72,8 @@ Quantizer<vector_dimension_t>::Fit(std::vector<vector_dimension_t> rawdata, size
         }
         // std::copy(labels.begin(), labels.end(), assignments_[m].begin());
     }
+
+    ready_ = true;
 }
 
 
@@ -87,18 +89,22 @@ Quantizer<vector_dimension_t>::GetCentroids() const { return centers_; }
 
 
 template <typename vector_dimension_t> void
-Quantizer<vector_dimension_t>::Load(const std::string & quantizer_filename)
+Quantizer<vector_dimension_t>::LoadCenters(const std::string & quantizer_filename)
 {
     std::vector<vector_dimension_t> flat_center;
     utils::VectorIO<vector_dimension_t>::LoadFromFile(flat_center, quantizer_filename);
     centers_ = utils::Resize<vector_dimension_t>::Nest(flat_center, M_, K_, Ds_);
+
+    ready_ = true;
 }
 
 
 
 template <typename vector_dimension_t> void
-Quantizer<vector_dimension_t>::Write(const std::string & quantizer_filename) const
+Quantizer<vector_dimension_t>::WriteCenters(const std::string & quantizer_filename) const
 {
+    assert( ready_ );
+
     auto flat_center = utils::Resize<vector_dimension_t>::Flatten(centers_);
     utils::VectorIO<vector_dimension_t>::WriteToFile(flat_center, {1, M_ * K_ * Ds_}, quantizer_filename);
 }
@@ -108,19 +114,16 @@ Quantizer<vector_dimension_t>::Write(const std::string & quantizer_filename) con
 template <typename vector_dimension_t> std::vector<std::vector<uint8_t>>
 Quantizer<vector_dimension_t>::Encode(const std::vector<vector_dimension_t> & rawdata)
 {
-    size_t N = rawdata.size();
+    size_t N = rawdata.size() / D_;
     std::vector<std::vector<uint8_t>> codes(N, std::vector<uint8_t>(M_, 0x00));
-    
     for (size_t m = 0; m < M_; m++)
     {
         std::vector<std::vector<vector_dimension_t>> vecs_sub(N, std::vector<vector_dimension_t>(Ds_));
-
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++)
         {
             std::copy_n(rawdata.begin() + i * D_ + m * Ds_, Ds_, vecs_sub[i].begin());
         }
-
         #pragma omp parallel for
         for (size_t i = 0; i < N; i++)
         {

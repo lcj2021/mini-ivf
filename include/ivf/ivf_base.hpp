@@ -102,6 +102,11 @@ public:
 };
 
 
+/* TEMPLATE CLASS */
+// IVFPQ based
+template class IvfBase<std::vector<uint8_t>, uint8_t>;
+template class IvfBase<std::vector<uint8_t>, float>;
+
 
 };
 
