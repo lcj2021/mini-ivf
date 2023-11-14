@@ -9,15 +9,14 @@
 #include "util.hpp"
 
 
-size_t D = 64;              // dimension of the vectors to index
-size_t nb = 100'000;       // size of the database we plan to index
-size_t nt = 15'000;         // make a set of nt training vectors in the unit cube (could be the database)
+size_t D = 128;              // dimension of the vectors to index
+size_t nb = 1'000'000;       // size of the database we plan to index
+size_t nt = 1'000'000;         // make a set of nt training vectors in the unit cube (could be the database)
 // size_t nb = 10'000;       // size of the database we plan to index
 // size_t nt = 1'000;         // make a set of nt training vectors in the unit cube (could be the database)
-size_t nq = 2'000;
-size_t segs = 20;
-int ncentroids = 25;
-int nprobe = 25;
+size_t nq = 1'000;
+int ncentroids = 4096;
+int nprobe = 1'100;
 
 toy::IVFConfig cfg(nb, D, nb / 50, 
     ncentroids, 1, D,
@@ -80,14 +79,14 @@ int main() {
     puts("Index find kNN!");
 
     // Recall@k
-    int k = 100;
+    int k = 10;
     std::vector<std::vector<size_t>> nnid(nq, std::vector<size_t>(k));
     std::vector<std::vector<float>> dist(nq, std::vector<float>(k));
     Timer timer_query;
     timer_query.Start();
     size_t total_searched_cnt = 0;
 
-    #pragma omp parallel for reduction(+ : total_searched_cnt)
+    // #pragma omp parallel for reduction(+ : total_searched_cnt)
     for (size_t q = 0; q < nq; ++q) {
         size_t searched_cnt;
         index.QueryBaseline(

@@ -501,16 +501,16 @@ void IndexIVFPQ<T>::WriteClusterVector()
         dataset_name += "/";
     }
     std::string prefix = "pqcode_";
-    std::string f_suffix = ".fvecs", ui8_suffix = ".ui8vecs", ul_suffix = ".ulvecs";
-    std::vector<size_t> posting_lists_lens(kc);
+    std::string f_suffix = ".fvecs", ui8_suffix = ".ivecs";
+    std::vector<uint32_t> posting_lists_lens(kc);
     for (size_t no = 0; no < kc; ++no) {
-        size_t posting_lists_len = posting_lists_[no].size();
+        uint32_t posting_lists_len = posting_lists_[no].size();
         auto cluster_vector_name = dataset_name + prefix + std::to_string(no) + ui8_suffix;
         WriteToFileBinary(db_codes_[no], {posting_lists_len, mp}, cluster_vector_name);
         posting_lists_lens[no] = posting_lists_len;
     }
 
-    WriteToFileBinary(posting_lists_lens, {1, kc}, dataset_name + "posting_lists_lens" + ul_suffix);
+    WriteToFileBinary(posting_lists_lens, {1, kc}, dataset_name + "posting_lists_lens" + ui8_suffix);
 }
 
 template<typename T>

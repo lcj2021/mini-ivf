@@ -15,16 +15,106 @@ float fvec_L2sqr_ref(const float *x, const float *y, size_t d)
     return res_;
 }
 
-float fvec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
+static inline __m128i masked_read (int d, const uint8_t *x)
 {
-    size_t i;
-    int32_t res_ = 0;
-    for (i = 0; i < d; i++) {
-        const int32_t tmp = x[i] - y[i];
-        res_ += tmp * tmp;
+    // assert (0 <= d && d < 16);
+
+#if defined(_MSC_VER)
+    __declspec(align(16)) uint8_t buf[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#else
+    __attribute__((__aligned__(16))) uint8_t buf[16] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+#endif
+
+    switch (d) {
+        case 15:
+            buf[14] = x[14];
+        case 14:
+            buf[13] = x[13];
+        case 13:
+            buf[12] = x[12];
+        case 12:
+            buf[11] = x[11];
+        case 11:
+            buf[10] = x[10];
+        case 10:
+            buf[9] = x[9];
+        case 9:
+            buf[8] = x[8];
+        case 8:
+            buf[7] = x[7];
+        case 7:
+            buf[6] = x[6];
+        case 6:
+            buf[5] = x[5];
+        case 5:
+            buf[4] = x[4];
+        case 4:
+            buf[3] = x[3];
+        case 3:
+            buf[2] = x[2];
+        case 2:
+            buf[1] = x[1];
+        case 1:
+            buf[0] = x[0];
     }
-    return (float)res_;
+    return _mm_load_si128((const __m128i *)buf);
 }
+
+float fvec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d) {
+    __m128 msum = _mm_setzero_ps();
+    const __m128i m128i_zero = _mm_setzero_si128();
+
+    while (d >= 16) {
+        __m128i mx = _mm_load_si128((const __m128i *)x); x += 16;
+        __m128i my = _mm_load_si128((const __m128i *)y); y += 16;
+        __m128i lo_m_8i16 = _mm_subs_epi16(_mm_unpacklo_epi8(mx, m128i_zero), _mm_unpacklo_epi8(my, m128i_zero));
+        __m128i hi_m_8i16 = _mm_subs_epi16(_mm_unpackhi_epi8(mx, m128i_zero), _mm_unpackhi_epi8(my, m128i_zero));
+        __m128i lo_m_8i16_2 = _mm_mullo_epi16(lo_m_8i16, lo_m_8i16);
+        __m128i hi_m_8i16_2 = _mm_mullo_epi16(hi_m_8i16, hi_m_8i16);
+        __m128i lolo_m_4i32 = _mm_unpacklo_epi16(lo_m_8i16_2, m128i_zero);
+        __m128i hilo_m_4i32 = _mm_unpackhi_epi16(lo_m_8i16_2, m128i_zero);
+        __m128i lohi_m_4i32 = _mm_unpacklo_epi16(hi_m_8i16_2, m128i_zero);
+        __m128i hohi_m_4i32 = _mm_unpackhi_epi16(hi_m_8i16_2, m128i_zero);
+        __m128i lo_m_4i32 = _mm_hadd_epi32(lolo_m_4i32, hilo_m_4i32);
+        __m128i hi_m_4i32 = _mm_hadd_epi32(lohi_m_4i32, hohi_m_4i32);
+        msum = _mm_add_ps(msum, _mm_cvtepi32_ps(lo_m_4i32));
+        msum = _mm_add_ps(msum, _mm_cvtepi32_ps(hi_m_4i32));
+        d -= 16;
+    }
+
+    if (d > 0) {
+        __m128i mx = masked_read(d, x);
+        __m128i my = masked_read(d, y);
+        __m128i lo_m_8i16 = _mm_subs_epi16(_mm_unpacklo_epi8(mx, m128i_zero), _mm_unpacklo_epi8(my, m128i_zero));
+        __m128i hi_m_8i16 = _mm_subs_epi16(_mm_unpackhi_epi8(mx, m128i_zero), _mm_unpackhi_epi8(my, m128i_zero));
+        __m128i lo_m_8i16_2 = _mm_mullo_epi16(lo_m_8i16, lo_m_8i16);
+        __m128i hi_m_8i16_2 = _mm_mullo_epi16(hi_m_8i16, hi_m_8i16);
+        __m128i lolo_m_4i32 = _mm_unpacklo_epi16(lo_m_8i16_2, m128i_zero);
+        __m128i hilo_m_4i32 = _mm_unpackhi_epi16(lo_m_8i16_2, m128i_zero);
+        __m128i lohi_m_4i32 = _mm_unpacklo_epi16(hi_m_8i16_2, m128i_zero);
+        __m128i hohi_m_4i32 = _mm_unpackhi_epi16(hi_m_8i16_2, m128i_zero);
+        __m128i lo_m_4i32 = _mm_hadd_epi32(lolo_m_4i32, hilo_m_4i32);
+        __m128i hi_m_4i32 = _mm_hadd_epi32(lohi_m_4i32, hohi_m_4i32);
+        msum = _mm_add_ps(msum, _mm_cvtepi32_ps(lo_m_4i32));
+        msum = _mm_add_ps(msum, _mm_cvtepi32_ps(hi_m_4i32));
+    }
+    
+    msum = _mm_hadd_ps (msum, msum);
+    msum = _mm_hadd_ps (msum, msum);
+
+    return _mm_cvtss_f32(msum);
+}
+
+// float fvec_L2sqr(const uint8_t *x, const uint8_t *y, size_t d)
+// {
+//     size_t i;
+//     int32_t res_ = 0;
+//     for (i = 0; i < d; i++) {
+//         const int32_t tmp = x[i] - y[i];
+//         res_ += tmp * tmp;
+//     }
+//     return (float)res_;
+// }
 
 float fvec_L2sqr(const uint8_t *x, const float *y, size_t d)
 {
