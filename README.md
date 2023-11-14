@@ -3,8 +3,8 @@ Index library for Balancer. We are prepare a basic library just for balancer, wh
 
 ## index-modules
 - [distance], passed, using hybrid-distance funtion to optimize caculation
-- [partition], 
-- [quantizer], 
+- [partition], passed
+- [quantizer], passed
 
 ## ivf-index
-- IVFPQ, 
+- IVFPQ, passed
