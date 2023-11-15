@@ -68,9 +68,7 @@ int main(int argc, char *argv[])
         // Recall@k
         ivf->SetNumThreads(48);
         timer.Start();
-        std::vector<std::vector<index::cluster_id_t>> books;
-        ivf->TopWID(nprobe, queries_nest, books);
-        ivf->TopKID(k, queries_nest, books, nnid, dists);
+        ivf->Search(k, nprobe, queries_nest, nnid, dists);
         timer.Stop();
         std::cout << "Search time: " << timer.GetTime() << " seconds" << std::endl;
 

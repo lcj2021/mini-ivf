@@ -99,6 +99,22 @@ public:
         std::vector<std::vector<cluster_id_t>> & books
     ) = 0;
 
+    /// @brief search for one
+    virtual void Search (
+        size_t k, size_t w,
+        const std::vector<vector_dimension_t> & query,
+        std::vector<vector_id_t> & vid,
+        std::vector<float> & dist
+    ) = 0;
+
+    /// @brief search for batch
+    virtual void Search (
+        size_t k, size_t w,
+        const std::vector<std::vector<vector_dimension_t>> & queries,
+        std::vector<std::vector<vector_id_t>> & vids,
+        std::vector<std::vector<float>> & dists
+    ) = 0;
+
 };
 
 

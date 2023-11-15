@@ -330,8 +330,8 @@ IndexIVF<vector_dimension_t>::TopKID (
         dist.emplace_back(d);
     }
 
-    std::cout << "num_searched_segments: " << num_searched_segments << std::endl;
-    std::cout << "num_searched_vectors: " << num_searched_vectors << std::endl;
+    // std::cout << "num_searched_segments: " << num_searched_segments << std::endl;
+    // std::cout << "num_searched_vectors: " << num_searched_vectors << std::endl;
 }
 
 
@@ -401,8 +401,8 @@ IndexIVF<vector_dimension_t>::TopKID (
         }
     }
 
-    std::cout << "num_searched_segments: " << num_searched_segments << std::endl;
-    std::cout << "num_searched_vectors: " << num_searched_vectors << std::endl;
+    // std::cout << "num_searched_segments: " << num_searched_segments << std::endl;
+    // std::cout << "num_searched_vectors: " << num_searched_vectors << std::endl;
 
 }
 
@@ -489,6 +489,43 @@ template <typename vector_dimension_t> bool IndexIVF<vector_dimension_t>::Ready(
 {
     return cq_.Ready() && posting_lists_.size() == kc_ && this->segments_.size() == kc_;
 }
+
+
+
+template <typename vector_dimension_t> void 
+IndexIVF<vector_dimension_t>::Search (
+    size_t k, size_t w,
+    const std::vector<vector_dimension_t> & query,
+    std::vector<vector_id_t> & vid,
+    std::vector<float> & dist
+)
+{
+    std::vector<cluster_id_t> book;
+    TopWID(w, query, book);
+    TopKID(k, query, book, vid, dist);
+}
+
+
+template <typename vector_dimension_t> void
+IndexIVF<vector_dimension_t>::Search(
+    size_t k, size_t w,
+    const std::vector<std::vector<vector_dimension_t>> & queries,
+    std::vector<std::vector<vector_id_t>> & vids,
+    std::vector<std::vector<float>> & dists
+)
+{
+    #pragma omp parallel for num_threads(this->num_threads_) schedule(dynamic, 1)
+    for (size_t i = 0; i < queries.size(); i++)
+    {
+        const auto & query = queries[i];
+        auto & vid = vids[i];
+        auto & dist = dists[i];
+        std::vector<cluster_id_t> book;
+        TopWID(w, query, book);
+        TopKID(k, query, book, vid, dist);
+    }
+}
+
 
 
 };

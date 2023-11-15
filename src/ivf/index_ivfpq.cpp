@@ -566,6 +566,39 @@ template <typename vector_dimension_t> bool IndexIVFPQ<vector_dimension_t>::Read
 
 
 
+template <typename vector_dimension_t> void 
+IndexIVFPQ<vector_dimension_t>::Search (
+    size_t k, size_t w,
+    const std::vector<vector_dimension_t> & query,
+    std::vector<vector_id_t> & vid,
+    std::vector<float> & dist
+)
+{
+    std::vector<cluster_id_t> book;
+    TopWID(w, query, book);
+    TopKID(k, query, book, vid, dist);
+}
+
+
+template <typename vector_dimension_t> void
+IndexIVFPQ<vector_dimension_t>::Search(
+    size_t k, size_t w,
+    const std::vector<std::vector<vector_dimension_t>> & queries,
+    std::vector<std::vector<vector_id_t>> & vids,
+    std::vector<std::vector<float>> & dists
+)
+{
+    #pragma omp parallel for num_threads(this->num_threads_) schedule(dynamic, 1)
+    for (size_t i = 0; i < queries.size(); i++)
+    {
+        std::vector<cluster_id_t> book;
+        TopWID(w, queries[i], book);
+        TopKID(k, queries[i], book, vids[i], dists[i]);
+    }
+}
+
+
+
 };
 
 };
