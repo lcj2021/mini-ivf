@@ -13,7 +13,8 @@ void STimer::Start() { t1_ = std::chrono::system_clock::now(); }
 
 void STimer::Stop()
 {
-    std::chrono::duration<double> diff = std::chrono::system_clock::now() - t1_;
+    auto t2 = std::chrono::system_clock::now();
+    std::chrono::duration<double> diff = t2 - t1_;
     total_ += diff.count();
 }
 

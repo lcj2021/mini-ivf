@@ -7,4 +7,5 @@ Index library for Balancer. We are prepare a basic library just for balancer, wh
 - [quantizer], passed
 
 ## ivf-index
-- IVFPQ, passed
+- [IVFPQ], passed
+- [IVF], passed
