@@ -9,26 +9,36 @@
 #include <random>
 #include <numeric>
 #include <cassert>
-#include <distance.hpp>
+#include <vector_ops.hpp>
 
 namespace index {
 
 template <typename vector_dimension_t> class Partition {
 public:
     // Linear search by L2 Distance computation. Return the best one (id, distance)
-    static std::pair<cluster_id_t, float> NearestCenter(
+    static std::pair<cluster_id_t, float> NearestCenter (
         const std::vector<vector_dimension_t> & query, 
         const std::vector<std::vector<vector_dimension_t>> & centers
     );
 
     // kmeans Lloyd implementation
     static std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t>> 
-    KMeans(
+    KMeans (
         const std::vector<std::vector<vector_dimension_t>>& obs, 
         size_t k, 
         size_t iter, 
-        const std::string& minit
+        const std::string& minit = "points"
     );
+
+
+    static std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t>>
+    BKM (
+        const std::vector<std::vector<vector_dimension_t>>& obs,
+        size_t k,
+        size_t iter
+    );
+
+
 };
 
 

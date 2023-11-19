@@ -9,3 +9,4 @@ Index library for Balancer. We are prepare a basic library just for balancer, wh
 ## ivf-index
 - [IVFPQ], passed
 - [IVF], passed
+- [IMI], need to optimize reorder part

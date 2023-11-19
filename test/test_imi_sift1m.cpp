@@ -3,27 +3,27 @@
 #include <random>
 #include <iostream>
 #include <numeric>
-#include <distance.hpp>
+#include <vector_ops.hpp>
 #include <cassert>
 #include <memory>
 #include <unordered_set>
 #include <algorithm>
 
-#include <ivf/index_ivf.hpp>
+#include <ivf/index_imi.hpp>
 #include <utils/stimer.hpp>
 #include <utils/resize.hpp>
 #include <utils/vector_io.hpp>
 
-const std::string name              = "IVF4SIFT1M";
+const std::string name              = "IMI 4 SIFT1M";
 size_t nt                           = 1'000'000;   
 size_t kc                           = 4096;
 size_t kp                           = 256;
-size_t mp                           = 64;
+size_t mp                           = 2;
 size_t k                            = 10;
 
 const std::string dataset_path      = "../../data/dataset/sift1m/";
-const std::string index_path        = "../../data/index/sift1m/ivf/";
-const std::string db_path           = "../../data/db/sift1m/ivf/";
+const std::string index_path        = "../../data/index/sift1m/imi/";
+const std::string db_path           = "../../data/db/sift1m/imi/";
 const std::string queries_path      = "/dk/anns/query/sift1m/";
 
 using vector_dimension_t = float;
@@ -47,13 +47,13 @@ int main(int argc, char *argv[])
 
     size_t nprobe = atoi(argv[1]);
 
-    auto ivf = new index::ivf::IndexIVF<float> (
-        nb, D, 6700, kc, 
+    auto imi = new index::ivf::IndexIMI<float> (
+        nb, D, 7500, kc, kp, mp, 
         index_path, db_path, name,
         index::IndexStatus::LOCAL
     );
 
-    std::cout << "Test from " << ivf->GetName() << std::endl;
+    std::cout << "Test from " << imi->GetName() << std::endl;
 
     std::vector<std::vector<index::vector_id_t>>    nnid(nq, std::vector<index::vector_id_t>(k));
     std::vector<std::vector<float>>                 dists(nq, std::vector<float>(k));
@@ -62,13 +62,13 @@ int main(int argc, char *argv[])
 
     if (argc == 3 && std::string(argv[2]) == "check") {
         puts("Start to check...");
-        ivf->LoadIndex();
-        ivf->LoadSegments();
+        imi->LoadIndex();
+        imi->LoadSegments();
 
         // Recall@k
-        ivf->SetNumThreads(48);
+        imi->SetNumThreads(48);
         timer.Start();
-        ivf->Search(k, nprobe, queries_nest, nnid, dists);
+        imi->Search(k, nprobe, queries_nest, nnid, dists);
         timer.Stop();
         std::cout << "Search time: " << timer.GetTime() << " seconds" << std::endl;
 
@@ -89,16 +89,15 @@ int main(int argc, char *argv[])
 
         puts("Index init start...");
 
-        ivf->SetTrainingConfig(nt, 123);
-        ivf->Train(database);
-        ivf->Populate(database);
+        imi->SetTrainingConfig(nt, 123);
+        imi->Train(database);
+        imi->Populate(database);
 
         std::cout << "Index init done." << std::endl;
 
         // Write index and PQCODE
-        ivf->WriteIndex();
-        ivf->WritePostingLists();
-        ivf->WriteSegments();
+        imi->WriteIndex();
+        imi->WriteSegments();
 
         std::cout << "Index write done." << std::endl;
 

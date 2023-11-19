@@ -20,7 +20,7 @@ protected:
     std::string index_path_;
     std::string db_path_;
 
-    std::vector<SegmentClass> segments_;
+    std::vector<SegmentClass> segments_;    // Store the data waiting to be traversed.
     
     size_t num_threads_;
 
@@ -119,7 +119,7 @@ public:
 
 
 /* TEMPLATE CLASS */
-// IVFPQ
+// IVFPQ, IMI
 template class IvfBase<std::vector<uint8_t>, uint8_t>;
 template class IvfBase<std::vector<uint8_t>, float>;
 // IVF

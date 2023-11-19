@@ -1,7 +1,7 @@
-#include <ivf/index_ivf.hpp>
+#include <ivf/index_ivfflat.hpp>
 #include <utils/vector_io.hpp>
 #include <utils/stimer.hpp>
-#include <distance.hpp>
+#include <vector_ops.hpp>
 
 #include <omp.h>
 #include <cassert>
@@ -25,7 +25,7 @@ namespace ivf {
 
 
 template <typename vector_dimension_t> 
-IndexIVF<vector_dimension_t>::IndexIVF(
+IndexIVFFLAT<vector_dimension_t>::IndexIVFFLAT(
     size_t N, size_t D, size_t L,
     size_t kc, // level-1-config
     const std::string & index_path,
@@ -46,7 +46,7 @@ IndexIVF<vector_dimension_t>::IndexIVF(
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::Populate(const std::vector<vector_dimension_t> & raw_data)
+IndexIVFFLAT<vector_dimension_t>::Populate(const std::vector<vector_dimension_t> & raw_data)
 {
     assert( this->status_ == IndexStatus::LOCAL && "Index must be local." );
     assert( cq_.Ready() && "CQ must be ready.");
@@ -77,7 +77,7 @@ IndexIVF<vector_dimension_t>::Populate(const std::vector<vector_dimension_t> & r
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::Train(const std::vector<vector_dimension_t> & raw_data)
+IndexIVFFLAT<vector_dimension_t>::Train(const std::vector<vector_dimension_t> & raw_data)
 {
     assert( this->status_ == IndexStatus::LOCAL && "Index must be local." );
     assert( nsamples_ && seed_ != -1 && "Please set nsamples and seed." );
@@ -111,7 +111,7 @@ IndexIVF<vector_dimension_t>::Train(const std::vector<vector_dimension_t> & raw_
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::LoadIndex()
+IndexIVFFLAT<vector_dimension_t>::LoadIndex()
 {
     std::cout << "Loading index..." << std::endl;
     /// @brief Load CQ codebook.
@@ -125,7 +125,7 @@ IndexIVF<vector_dimension_t>::LoadIndex()
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::WriteIndex()
+IndexIVFFLAT<vector_dimension_t>::WriteIndex()
 {
     assert( this->status_ == IndexStatus::LOCAL && "Index must be local." );
 
@@ -134,7 +134,7 @@ IndexIVF<vector_dimension_t>::WriteIndex()
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::LoadSegments()
+IndexIVFFLAT<vector_dimension_t>::LoadSegments()
 {
     std::cout << "Loading all segments..." << std::endl;
 
@@ -158,7 +158,7 @@ IndexIVF<vector_dimension_t>::LoadSegments()
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::LoadSegments(const std::vector<cluster_id_t> & book)
+IndexIVFFLAT<vector_dimension_t>::LoadSegments(const std::vector<cluster_id_t> & book)
 {
     std::cout << "Loading " << book.size() << " segments..." << std::endl;
 
@@ -195,7 +195,7 @@ IndexIVF<vector_dimension_t>::LoadSegments(const std::vector<cluster_id_t> & boo
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::WriteSegments()
+IndexIVFFLAT<vector_dimension_t>::WriteSegments()
 {
     assert( this->status_ == IndexStatus::LOCAL && "Index must be local." );
 
@@ -205,15 +205,16 @@ IndexIVF<vector_dimension_t>::WriteSegments()
     {
         posting_lists_size[id] = posting_lists_[id].size();
         utils::VectorIO<vector_dimension_t>::WriteToFile( this->segments_[id], { posting_lists_size[id], D_ }, this->db_path_ + vector_prefix_ + std::to_string(id) );
+        utils::VectorIO<vector_id_t>::WriteToFile(posting_lists_[id], { 1, posting_lists_size[id] }, this->db_path_ + id_prefix_ + std::to_string(id));
     }
 
-    utils::VectorIO<size_t>::WriteToFile(posting_lists_size, {1, kc_}, this->db_path_ + "posting_lists_size");
+    utils::VectorIO<size_t>::WriteToFile(posting_lists_size, {1, kc_}, this->db_path_ + posting_lists_size_file_);
 }
 
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::InsertIvf(const std::vector<vector_dimension_t> & raw_data)
+IndexIVFFLAT<vector_dimension_t>::InsertIvf(const std::vector<vector_dimension_t> & raw_data)
 {
     assert( N_ == raw_data.size() / D_ );
     std::vector<omp_lock_t> locks(kc_);
@@ -223,7 +224,7 @@ IndexIVF<vector_dimension_t>::InsertIvf(const std::vector<vector_dimension_t> & 
         omp_init_lock(&locks[i]);
     }
 
-    std::cout << "Start to insert pqcodes to IVF index" << std::endl;
+    std::cout << "Start to insert data to IVF index" << std::endl;
     utils::STimer timer;
     timer.Start();
 
@@ -255,13 +256,13 @@ IndexIVF<vector_dimension_t>::InsertIvf(const std::vector<vector_dimension_t> & 
     }
 
     timer.Stop();
-    std::cout << "Finish inserting pqcodes to IVF index, time cost: " << timer.GetTime() << " s" << std::endl;
+    std::cout << "Finish inserting data to IVF index, time cost: " << timer.GetTime() << " s" << std::endl;
 }
 
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::SetTrainingConfig(size_t nsamples, int seed)
+IndexIVFFLAT<vector_dimension_t>::SetTrainingConfig(size_t nsamples, int seed)
 {
     nsamples_ = nsamples;
     seed_ = seed;
@@ -270,21 +271,7 @@ IndexIVF<vector_dimension_t>::SetTrainingConfig(size_t nsamples, int seed)
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::WritePostingLists() const
-{
-    for (cluster_id_t id = 0; id < kc_; id++)
-    {
-        utils::VectorIO<vector_id_t>::WriteToFile(
-            posting_lists_[id], { 1, posting_lists_[id].size() }, 
-            this->db_path_ + id_prefix_ + std::to_string(id)
-        );
-    }
-}
-
-
-
-template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::TopKID (
+IndexIVFFLAT<vector_dimension_t>::TopKID (
     size_t k, 
     const std::vector<vector_dimension_t> & query, 
     const std::vector<cluster_id_t> & book,
@@ -301,15 +288,16 @@ IndexIVF<vector_dimension_t>::TopKID (
 
     size_t num_searched_segments = 0;
     size_t num_searched_vectors = 0;
-
+    
     for (size_t i = 0; i < book.size() && num_searched_vectors < L_; i++) {
         cluster_id_t cid = book[i];
         const auto & posting_list = posting_lists_[cid];
+        const auto & segment = this->segments_[cid];
         for (size_t j = 0; j < posting_list.size() && num_searched_vectors < L_; j++)
         {
             score.emplace_back (
                 posting_list[j],
-                vec_L2sqr(query.data(), this->segments_[cid].data() + j * D_, D_)
+                vec_L2sqr(query.data(), segment.data() + j * D_, D_)
             );
             num_searched_vectors ++;
         }
@@ -323,11 +311,12 @@ IndexIVF<vector_dimension_t>::TopKID (
         }
     );
 
-    vid.reserve(actual_k);
-    dist.reserve(actual_k);
-    for ( const auto & [id, d]: score ) {
-        vid.emplace_back(id);
-        dist.emplace_back(d);
+    vid.resize(actual_k);
+    dist.resize(actual_k);
+    for (size_t i = 0; i < actual_k; i++)
+    {
+        vid[i] = score[i].first;
+        dist[i] = score[i].second;
     }
 
     // std::cout << "num_searched_segments: " << num_searched_segments << std::endl;
@@ -337,7 +326,7 @@ IndexIVF<vector_dimension_t>::TopKID (
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::TopKID (
+IndexIVFFLAT<vector_dimension_t>::TopKID (
     size_t k,
     const std::vector<std::vector<vector_dimension_t>> & queries,
     const std::vector<std::vector<cluster_id_t>> & books,
@@ -409,7 +398,7 @@ IndexIVF<vector_dimension_t>::TopKID (
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::TopWID(
+IndexIVFFLAT<vector_dimension_t>::TopWID(
     size_t w, 
     const std::vector<vector_dimension_t> & query,
     std::vector<cluster_id_t> & book
@@ -421,8 +410,7 @@ IndexIVF<vector_dimension_t>::TopWID(
     score.resize(kc_);
     for (cluster_id_t cid = 0; cid < kc_; cid++)
     {
-        score[cid].first = cid;
-        score[cid].second = vec_L2sqr(query.data(), centers_cq_[cid].data(), D_);
+        score[cid] = { cid, vec_L2sqr(query.data(), centers_cq_[cid].data(), D_) };
     }
 
     size_t actual_w = std::min(w, kc_);
@@ -444,7 +432,7 @@ IndexIVF<vector_dimension_t>::TopWID(
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::TopWID(
+IndexIVFFLAT<vector_dimension_t>::TopWID(
     size_t w, 
     const std::vector<std::vector<vector_dimension_t>> & queries,
     std::vector<std::vector<cluster_id_t>> & books
@@ -466,8 +454,7 @@ IndexIVF<vector_dimension_t>::TopWID(
         score.resize(kc_);
         for (cluster_id_t cid = 0; cid < kc_; cid++)
         {
-            score[cid].first = cid;
-            score[cid].second = vec_L2sqr(query.data(), centers_cq_[cid].data(), D_);
+            score[cid] = { cid, vec_L2sqr(query.data(), centers_cq_[cid].data(), D_) };
         }
 
         std::partial_sort(score.begin(), score.begin() + actual_w, score.end(),
@@ -485,7 +472,7 @@ IndexIVF<vector_dimension_t>::TopWID(
 
 
 
-template <typename vector_dimension_t> bool IndexIVF<vector_dimension_t>::Ready()
+template <typename vector_dimension_t> bool IndexIVFFLAT<vector_dimension_t>::Ready()
 {
     return cq_.Ready() && posting_lists_.size() == kc_ && this->segments_.size() == kc_;
 }
@@ -493,7 +480,7 @@ template <typename vector_dimension_t> bool IndexIVF<vector_dimension_t>::Ready(
 
 
 template <typename vector_dimension_t> void 
-IndexIVF<vector_dimension_t>::Search (
+IndexIVFFLAT<vector_dimension_t>::Search (
     size_t k, size_t w,
     const std::vector<vector_dimension_t> & query,
     std::vector<vector_id_t> & vid,
@@ -507,7 +494,7 @@ IndexIVF<vector_dimension_t>::Search (
 
 
 template <typename vector_dimension_t> void
-IndexIVF<vector_dimension_t>::Search(
+IndexIVFFLAT<vector_dimension_t>::Search(
     size_t k, size_t w,
     const std::vector<std::vector<vector_dimension_t>> & queries,
     std::vector<std::vector<vector_id_t>> & vids,

@@ -1,10 +1,9 @@
-#ifndef INCLUDE_INDEX_IVFPQ_HPP
-#define INCLUDE_INDEX_IVFPQ_HPP
+#ifndef INCLUDE_INDEX_IVFFLAT_HPP
+#define INCLUDE_INDEX_IVFFLAT_HPP
+
 
 #include <ivf/ivf_base.hpp>
-#include <ivf/distance_table.hpp>
 #include <quantizer.hpp>
-
 #include <vector>
 
 
@@ -14,18 +13,17 @@ namespace ivf {
 
 
 /**
- * Configuration structureL_1
+ * Configuration structure
  * @param N_ the number of data
  * @param D_ the number of dimensions
  * @param L_ the expected number of candidates involed when searching is performed
- * @param kc, kp the number of coarse quantizer (nlist) and product quantizer's centers (1 << nbits). Default: 100, 256
- * @param mc, mp the number of subspace for coarse quantizer and product quantizer. mc must be 1
- * @param dc, dp the dimensions of subspace for coarse quantize and product quantizer. dc must be D_.  dp = D_ / mp
- * @param index_path path to the index files: pq_centers, cq_centers
- * @param db_path path to the DB files: id_* & pqcode_* & posting_lists_size
+ * @param kc the number of coarse quantizer's (nlist) centers. Default: 100
+ * @param mc the number of subspace for coarse quantizer. mc must be 1
+ * @param dc the dimensions of subspace for coarse quantize and product quantizer. dc must be D_.  dp = D_ / mp
+ * @param db_path path to the DB files
  * @param db_prefix the prefix of DB files
  */
-template <typename vector_dimension_t> class IndexIVFPQ: public IvfBase <std::vector<uint8_t>, vector_dimension_t>
+template <typename vector_dimension_t> class IndexIVFFLAT: public IvfBase <std::vector<vector_dimension_t>, vector_dimension_t>
 {
 private: /// variables
     // index info
@@ -36,10 +34,6 @@ private: /// variables
     size_t kc_;
     size_t mc_;
     size_t dc_;
-    // level-2-index
-    size_t kp_;
-    size_t mp_;
-    size_t dp_;
 
     /*==============================================================//
     // Inherit these variables from father.                         //
@@ -51,31 +45,26 @@ private: /// variables
     // - vector<SegmentClass> segments_;                            //
     //==============================================================*/
 
-    Quantizer<vector_dimension_t> cq_;
-    Quantizer<vector_dimension_t> pq_;
-    std::vector<std::vector<vector_id_t>> posting_lists_; // id for each vectors in segments
+    std::vector<std::vector<vector_id_t>> posting_lists_;
 
-    size_t nsamples_; // training sample number
-    int seed_;        // seed
+    size_t nsamples_;
+    int seed_;
+
+    Quantizer<vector_dimension_t> cq_;
 
     std::vector<std::vector<vector_dimension_t>> centers_cq_;
-
-    std::vector<std::vector<std::vector<vector_dimension_t>>> centers_pq_;
 
     /// const variables
     const std::string posting_lists_size_file_      = "posting_lists_size"; 
     const std::string cq_centers_                   = "cq_centers";
-    const std::string pq_centers_                   = "pq_centers";
     const std::string vector_prefix_                = "pqcode_";
     const std::string id_prefix_                    = "id_";
 
-
 public: /// methods
-    explicit IndexIVFPQ(
-        size_t N, size_t D, size_t L, 
-        size_t kc,              // level-1-config
-        size_t kp, size_t mp,   // level-2-config
-        const std::string & index_path, 
+    explicit IndexIVFFLAT(
+        size_t N, size_t D, size_t L,
+        size_t kc, // level-1-config
+        const std::string & index_path,
         const std::string & db_path,
         const std::string & name = "",
         IndexStatus status = IndexStatus::LOCAL
@@ -97,7 +86,7 @@ public: /// methods
 
     void SetTrainingConfig(size_t nsamples, int seed);
 
-    /// @brief Single Query (1 thread)
+    /// @brief Single Query
     void TopKID (
         size_t k, 
         const std::vector<vector_dimension_t> & query, 
@@ -115,19 +104,20 @@ public: /// methods
         std::vector<std::vector<float>> & dists
     ) override;
 
-    /// @brief Single Topw query (1 thread)
+    /// @brief Single Topw query
     void TopWID (
         size_t w, 
         const std::vector<vector_dimension_t> & query,
         std::vector<cluster_id_t> & book
     ) override;
-
+    
     /// @brief Batch Topw Queries
     void TopWID (
         size_t w, 
         const std::vector<std::vector<vector_dimension_t>> & queries,
         std::vector<std::vector<cluster_id_t>> & books
     ) override;
+
 
     /// @brief search for one
     void Search (
@@ -145,29 +135,22 @@ public: /// methods
         std::vector<std::vector<float>> & dists
     ) override;
 
-
-private: /// methods
+private:
     void InsertIvf(const std::vector<vector_dimension_t> & raw_data);
-
-    /// @brief function for asym-distance, given dtable and pqcode (uint8_t *). 
-    inline float ADist(const DistanceTable & dtable, const uint8_t * code) const;
-
-    inline DistanceTable DTable(const std::vector<vector_dimension_t> & vec) const;
 
     bool Ready(); // ready to topk (all elements ready)
 
 };
 
 
-/*************************************** 
- * @class Template class declarations. * 
- ***************************************/
-template class IndexIVFPQ<uint8_t>;
-template class IndexIVFPQ<float>;
+/// @brief Template Class
+template class IndexIVFFLAT<uint8_t>;
+template class IndexIVFFLAT<float>;
 
 
 };
 
 };
+
 
 #endif

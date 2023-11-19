@@ -27,6 +27,7 @@ template class Resize<uint16_t>;
 template class Resize<uint32_t>;
 template class Resize<uint64_t>;
 template class Resize<float>;
+// template class Resize<size_t>;
 
 
 };

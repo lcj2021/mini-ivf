@@ -1,6 +1,7 @@
 #include <partition.hpp>
 #include <iostream>
 #include <algorithm>
+#include <memory>
 
 namespace index {
 
@@ -98,6 +99,71 @@ std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t
     return std::make_pair(centroids, labels);
 
 }
+
+
+
+template <typename vector_dimension_t> 
+std::pair<std::vector<std::vector<vector_dimension_t>>, std::vector<cluster_id_t>>
+BKM (
+    const std::vector<std::vector<vector_dimension_t>>& obs,
+    size_t k,
+    size_t iter
+)
+{
+    size_t N = obs.size();
+    assert( N >= k && "N must be greater than k." );
+    size_t D = obs[0].size();
+    std::vector<std::vector<vector_dimension_t>> centroids (k, std::vector<vector_dimension_t>(D));
+    auto Dist_ptr = std::make_unique<std::vector<float>> (N * N);
+    auto & Dist = *Dist_ptr;
+    Dist.resize(N * N);
+
+    /// @brief Init C0
+    {  
+        std::default_random_engine rd;
+        // std::mt19937 gen(rd());
+        std::uniform_int_distribution<vector_id_t> dist(0, N - 1);
+
+        std::vector<vector_id_t> initial_indices(k);
+        for (size_t i = 0; i < k; i++) {
+            vector_id_t idx = dist(rd);
+            initial_indices[i] = idx;
+            centroids[i] = obs[idx];
+        }
+    }
+
+    /// @brief Iteration for iter times.
+    while ( iter -- ) 
+    {
+        /// @brief Caculate distance
+        #pragma omp parallel for
+        for (size_t i = 0; i < N; i++)
+        {
+            for (size_t j = 0; j < k; j++)
+            {
+                Dist[i * N + j] = vec_L2sqr(obs[i].data(), centroids[j].data(), D);
+            }
+            for (size_t j = k; j < N; j++)
+            {
+                size_t idx = i * N + j;
+                Dist[idx] = Dist[idx - k];
+            }
+        }
+
+        /// @brief Assignment step
+        /* Step 1: Subtract row minima */
+        #pragma omp parallel for
+        for (size_t i = 0; i < N; i++)
+        {
+            float min_row = std::min_element(Dist.begin() + i * N, Dist.begin() + (i + 1) * N);
+            
+        }
+
+        /// @brief Update step
+    }
+
+}
+
 
 
 };

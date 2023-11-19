@@ -63,7 +63,7 @@ Quantizer<vector_dimension_t>::Fit(std::vector<vector_dimension_t> rawdata, size
             std::copy_n(rawdata.begin() + i * D_ + m * Ds_, Ds_, vecs_sub[i].begin());
         }
 
-        auto [centroids, labels] = Partition<vector_dimension_t>::KMeans(vecs_sub, K_, iter, "points");
+        auto [centroids, labels] = Partition<vector_dimension_t>::KMeans(vecs_sub, K_, iter);
 
         #pragma omp parallel for
         for (size_t k = 0; k < K_; k++)
